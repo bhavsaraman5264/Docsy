@@ -62,6 +62,17 @@ detekt {
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
 }
 
+// M1 spike: throwaway test harness, M2 ke baad hat jayega.
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
+    exclude("**/spike/**")
+}
+
+ktlint {
+    filter {
+        exclude("**/spike/**")
+    }
+}
+
 dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

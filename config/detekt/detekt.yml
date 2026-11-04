@@ -1,0 +1,22 @@
+naming:
+  FunctionNaming:
+    ignoreAnnotated:
+      - Composable
+complexity:
+  LongParameterList:
+    ignoreAnnotated:
+      - Composable
+  TooManyFunctions:
+    active: false
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreAnnotated:
+      - Composable
+      - Preview
+    excludes:
+      - '**/ui/theme/**'
+      - '**/test/**'
+  UnusedPrivateFunction:
+    ignoreAnnotated:
+      - Preview

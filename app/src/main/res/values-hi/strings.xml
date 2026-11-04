@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_open_file">फ़ाइल खोलो</string>
+    <string name="action_settings">सेटिंग्स</string>
+    <string name="action_back">वापस</string>
+    <string name="home_empty_title">कोई फ़ाइल खोलो, वो यहाँ दिखेगी</string>
+    <string name="error_file_gone">यह फ़ाइल अब उपलब्ध नहीं है</string>
+    <string name="error_corrupt">यह फ़ाइल नहीं खुल रही</string>
+    <string name="error_unsupported">यह फ़ाइल टाइप अभी सपोर्ट नहीं है</string>
+    <string name="error_no_space">फ़ोन में जगह कम है</string>
+    <string name="error_too_large">यह फ़ाइल खोलने के लिए बहुत बड़ी है</string>
+    <string name="error_wrong_password">यह पासवर्ड सही नहीं है</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Kholo</string>
+    <string name="action_open_file">Open file</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_back">Back</string>
+    <string name="home_empty_title">Open a file and it will show up here</string>
+    <string name="error_file_gone">This file is no longer available</string>
+    <string name="error_corrupt">This file won\'t open</string>
+    <string name="error_unsupported">This file type isn\'t supported yet</string>
+    <string name="error_no_space">Not enough storage on your phone</string>
+    <string name="error_too_large">This file is too large to open</string>
+    <string name="error_wrong_password">That password didn\'t work</string>
+</resources>

@@ -1,0 +1,14 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+*.keystore
+*.jks
+keystore.properties
+# Bade generated fixtures: `node tools/fixtures/generate.mjs` se dobara bante hain
+fixtures/generated/
+# Asli documents kabhi commit nahi hone chahiye
+fixtures/private/

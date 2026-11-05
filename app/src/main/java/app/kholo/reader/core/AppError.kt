@@ -12,12 +12,21 @@ sealed interface AppError {
         override val messageRes = R.string.error_wrong_password
     }
 
+    /** Is phone ka PDF engine password wali file khol hi nahi sakta. */
+    data object PasswordUnsupported : AppError {
+        override val messageRes = R.string.error_password_unsupported
+    }
+
     data object FileGone : AppError {
         override val messageRes = R.string.error_file_gone
     }
 
     data object Corrupt : AppError {
         override val messageRes = R.string.error_corrupt
+    }
+
+    data object Empty : AppError {
+        override val messageRes = R.string.error_empty
     }
 
     data object Unsupported : AppError {

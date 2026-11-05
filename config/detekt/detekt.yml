@@ -3,6 +3,12 @@ naming:
     ignoreAnnotated:
       - Composable
 complexity:
+  LongMethod:
+    ignoreAnnotated:
+      - Composable
+  CyclomaticComplexMethod:
+    ignoreAnnotated:
+      - Composable
   LongParameterList:
     ignoreAnnotated:
       - Composable

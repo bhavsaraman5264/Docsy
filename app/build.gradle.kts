@@ -44,6 +44,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     lint {
@@ -62,17 +63,6 @@ detekt {
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
 }
 
-// M1 spike: throwaway test harness, M2 ke baad hat jayega.
-tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
-    exclude("**/spike/**")
-}
-
-ktlint {
-    filter {
-        exclude("**/spike/**")
-    }
-}
-
 dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -85,10 +75,13 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.androidx.pdf.viewer.fragment)
     implementation(libs.androidx.tracing)
+    implementation(libs.datastore.preferences)
+    implementation(libs.androidx.core)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.leakcanary)
 
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20250517")
     testImplementation(libs.coroutines.test)
 }

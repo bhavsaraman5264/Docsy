@@ -6,6 +6,7 @@ import app.kholo.reader.core.log.AppLog
 import app.kholo.reader.core.log.LogLevel
 import app.kholo.reader.core.log.RingBufferTree
 import app.kholo.reader.debug.DebugHooksImpl
+import app.kholo.reader.report.CrashRecorder
 
 private const val REPORT_EVENT_CAPACITY = 200
 
@@ -20,6 +21,7 @@ class KholoApp : Application() {
         val hooks = DebugHooksImpl()
         AppLog.plant(reportBuffer, hooks.logTree)
         hooks.onAppCreate(this)
-        container = AppContainer(logBuffer = reportBuffer)
+        val crashRecorder = CrashRecorder(this).also { it.install() }
+        container = AppContainer(this, reportBuffer, crashRecorder)
     }
 }

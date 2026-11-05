@@ -16,11 +16,11 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.docx.DocxScreen
 import app.kholo.reader.open.DocumentType
-import app.kholo.reader.pdf.PasswordScreen
 import app.kholo.reader.pdf.PdfScreen
 import app.kholo.reader.table.GridScreen
 import app.kholo.reader.text.TextScreen
 import app.kholo.reader.ui.theme.LocalReaderBackground
+import app.kholo.reader.unlock.UnlockScreen
 
 @Composable
 fun ViewerRoute(
@@ -41,10 +41,12 @@ fun ViewerRoute(
             contentAlignment = Alignment.Center,
         ) { CircularProgressIndicator() }
 
-        is ViewerUiState.NeedsPassword -> PasswordScreen(
+        is ViewerUiState.NeedsPassword -> UnlockScreen(
             name = current.name,
             failedAttempt = current.failedAttempt,
-            onSubmit = viewModel::submitPassword,
+            detailsFailed = current.detailsFailed,
+            onPassword = viewModel::submitPassword,
+            onDetails = viewModel::unlockWith,
             onBack = onBack,
         )
 

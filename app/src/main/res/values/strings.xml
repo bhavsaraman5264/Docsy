@@ -78,5 +78,19 @@
     <string name="slide_number">Slide %1$d</string>
     <string name="view_page">Page</string>
     <string name="view_read">Read</string>
+    <string name="action_open_with_password">Open with password</string>
+    <string name="kind_aadhaar">Aadhaar</string>
+    <string name="kind_income_tax">ITR / AIS / e-PAN</string>
+    <string name="kind_form16">Form 16</string>
+    <string name="kind_26as">Form 26AS</string>
+    <string name="kind_bank">Bank</string>
+    <string name="kind_other">Other</string>
+    <string name="unlock_name">Name as on the document</string>
+    <string name="unlock_year">Birth year (YYYY)</string>
+    <string name="unlock_dob">Date of birth (DDMMYYYY)</string>
+    <string name="unlock_pan">PAN</string>
+    <string name="unlock_mobile">Registered mobile (optional)</string>
+    <string name="unlock_bank_note">Every bank uses its own format, so this may not work. The password box below always does.</string>
+    <string name="unlock_details_failed">Didn\'t open with these details. Check them, or type the password below.</string>
     <string name="error_no_app">No app found for this</string>
 </resources>

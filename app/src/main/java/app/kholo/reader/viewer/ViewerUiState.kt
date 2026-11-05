@@ -11,7 +11,11 @@ class OpenDocument(val document: PdfDocument, val name: String, val uri: String,
 sealed interface ViewerUiState {
     data object Loading : ViewerUiState
 
-    data class NeedsPassword(val name: String, val failedAttempt: Boolean) : ViewerUiState
+    data class NeedsPassword(
+        val name: String,
+        val failedAttempt: Boolean,
+        val detailsFailed: Boolean = false,
+    ) : ViewerUiState
 
     data class Ready(val doc: OpenDocument) : ViewerUiState
 

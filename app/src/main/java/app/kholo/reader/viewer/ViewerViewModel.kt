@@ -14,6 +14,9 @@ import app.kholo.reader.open.DocumentType
 import app.kholo.reader.pdf.PdfCapabilities
 import app.kholo.reader.recents.RecentFile
 import app.kholo.reader.recents.fileIdentity
+import app.kholo.reader.unlock.DocKind
+import app.kholo.reader.unlock.PasswordRules
+import app.kholo.reader.unlock.UnlockDetails
 import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,6 +81,30 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
     fun submitPassword(password: String) {
         _state.value = ViewerUiState.Loading
         viewModelScope.launch { openPdf(password) }
+    }
+
+    /** User ke details se bane kuch passwords try karta hai. Details yahan se aage kahin nahi jate. */
+    fun unlockWith(kind: DocKind, details: UnlockDetails) {
+        val name = info?.name.orEmpty()
+        _state.value = ViewerUiState.Loading
+        viewModelScope.launch {
+            AppLog.i(LogTag.UNLOCK) { "trying kind=$kind" }
+            for (candidate in PasswordRules.candidates(kind, details)) {
+                when (val result = container.pdfOpener.open(uri, candidate)) {
+                    is DocResult.Success -> {
+                        AppLog.i(LogTag.UNLOCK) { "unlocked kind=$kind" }
+                        ready(result.value, name)
+                        return@launch
+                    }
+                    is DocResult.Failure -> if (result.error != AppError.WrongPassword) {
+                        fail(result.error, name)
+                        return@launch
+                    }
+                }
+            }
+            AppLog.i(LogTag.UNLOCK) { "no match kind=$kind" }
+            _state.value = ViewerUiState.NeedsPassword(name, failedAttempt = false, detailsFailed = true)
+        }
     }
 
     private suspend fun openPdf(password: String?) {

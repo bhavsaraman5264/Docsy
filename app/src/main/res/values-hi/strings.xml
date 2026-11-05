@@ -75,5 +75,19 @@
     <string name="slide_number">स्लाइड %1$d</string>
     <string name="view_page">पेज</string>
     <string name="view_read">पढ़ो</string>
+    <string name="action_open_with_password">पासवर्ड से खोलो</string>
+    <string name="kind_aadhaar">आधार</string>
+    <string name="kind_income_tax">ITR / AIS / e-PAN</string>
+    <string name="kind_form16">फ़ॉर्म 16</string>
+    <string name="kind_26as">फ़ॉर्म 26AS</string>
+    <string name="kind_bank">बैंक</string>
+    <string name="kind_other">और कुछ</string>
+    <string name="unlock_name">दस्तावेज़ पर लिखा नाम</string>
+    <string name="unlock_year">जन्म का साल (YYYY)</string>
+    <string name="unlock_dob">जन्म तिथि (DDMMYYYY)</string>
+    <string name="unlock_pan">PAN</string>
+    <string name="unlock_mobile">रजिस्टर्ड मोबाइल (ज़रूरी नहीं)</string>
+    <string name="unlock_bank_note">हर बैंक का अपना फ़ॉर्मेट होता है, इसलिए शायद न खुले। नीचे पासवर्ड बॉक्स हमेशा काम करता है।</string>
+    <string name="unlock_details_failed">इन जानकारियों से नहीं खुली। दोबारा देखो, या नीचे पासवर्ड डालो।</string>
     <string name="error_no_app">इसके लिए कोई ऐप नहीं मिली</string>
 </resources>

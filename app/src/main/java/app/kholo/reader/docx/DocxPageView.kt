@@ -221,10 +221,12 @@ private fun PageParagraph(block: DocBlock.Paragraph) {
 @Composable
 private fun PageTableRow(item: PageItem.TableRow, page: PageSetup) {
     val available = page.width - page.marginLeft - page.marginRight
-    val total = item.grid.sum().takeIf { it > 0f } ?: available
+    // Merged cells ya kharab grid par column gin nahi milte. Tab barabar baantna hi sahi hai.
+    val grid = item.grid.takeIf { it.size == item.cells.size && it.all { width -> width > 0f } }
+    val total = grid?.sum() ?: 1f
     Row {
         item.cells.forEachIndexed { index, cell ->
-            val share = item.grid.getOrNull(index)?.div(total) ?: (1f / item.cells.size)
+            val share = grid?.get(index)?.div(total) ?: (1f / item.cells.size)
             val fill = cell.fill?.let(::parseColor) ?: Color.Transparent
             Box(
                 Modifier

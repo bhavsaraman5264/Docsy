@@ -1,14 +1,12 @@
 package app.kholo.reader.ui.components
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,8 +21,7 @@ import app.kholo.reader.R
 import app.kholo.reader.ui.theme.KholoTheme
 import app.kholo.reader.ui.theme.Spacing
 
-private val ICON_CIRCLE = 80.dp
-private val ICON_SIZE = 36.dp
+private val ICON_SIZE = 40.dp
 
 /** Icon, bada sandesh, chhoti madad aur ek hi action. */
 @Composable
@@ -40,20 +37,15 @@ fun EmptyState(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            modifier = Modifier.size(ICON_CIRCLE).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painterResource(icon),
-                contentDescription = null,
-                modifier = Modifier.size(ICON_SIZE),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
+        Icon(
+            painterResource(icon),
+            contentDescription = null,
+            modifier = Modifier.size(ICON_SIZE),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(
             text = title,
-            modifier = Modifier.padding(top = Spacing.xl),
+            modifier = Modifier.padding(top = Spacing.l),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,

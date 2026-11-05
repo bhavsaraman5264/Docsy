@@ -27,10 +27,10 @@
     <string name="action_remove_recent">हाल की सूची से हटाओ</string>
     <string name="tab_recent">हाल की</string>
     <string name="tab_favorites">पसंदीदा</string>
-    <string name="home_empty_title">अभी कोई फ़ाइल नहीं</string>
-    <string name="home_empty_hint">कोई फ़ाइल खोलो, वो जल्दी खोलने के लिए यहाँ दिखेगी</string>
+    <string name="home_empty_title">अभी यहाँ कुछ नहीं</string>
+    <string name="home_empty_hint">जो फ़ाइल खोलोगे, वो यहाँ दिखेगी</string>
     <string name="favorites_empty">अभी कोई पसंदीदा नहीं</string>
-    <string name="favorites_empty_hint">फ़ाइल का स्टार दबाओ, वो यहाँ आ जाएगी</string>
+    <string name="favorites_empty_hint">किसी भी फ़ाइल का स्टार दबाओ</string>
     <string name="time_just_now">अभी</string>
     <string name="page_indicator">%1$d / %2$d</string>
     <string name="page_jump_title">पेज पर जाओ</string>
@@ -38,7 +38,7 @@
     <string name="search_count">%2$d में से %1$d</string>
     <string name="search_none">कुछ नहीं मिला</string>
     <string name="password_title">इस फ़ाइल पर पासवर्ड है</string>
-    <string name="password_hint">खोलने के लिए पासवर्ड डालो। यह आपके फ़ोन से बाहर नहीं जाता।</string>
+    <string name="password_hint">पासवर्ड आपके फ़ोन से बाहर नहीं जाता</string>
     <string name="password_label">पासवर्ड</string>
     <string name="settings_theme">थीम</string>
     <string name="same_as_phone">फ़ोन जैसा</string>
@@ -69,8 +69,8 @@
     <string name="table_empty">इस शीट में कोई टेबल नहीं है</string>
     <string name="table_partial">इस फ़ाइल का कुछ हिस्सा नहीं पढ़ा जा सका</string>
     <string name="text_truncated">इस फ़ाइल के शुरू के 16 MB ही दिखाए गए हैं</string>
-    <string name="note_reading_view">रीडिंग व्यू: Word का पेज लेआउट अलग दिख सकता है</string>
-    <string name="note_slides">स्लाइड का टेक्स्ट और तस्वीरें। एनिमेशन नहीं दिखते</string>
+    <string name="note_reading_view">लेआउट Word से अलग हो सकता है</string>
+    <string name="note_slides">सिर्फ़ टेक्स्ट और तस्वीरें</string>
     <string name="note_skipped">कुछ कंटेंट यहाँ नहीं दिखाया जा सका</string>
     <string name="slide_number">स्लाइड %1$d</string>
     <string name="view_page">पेज</string>

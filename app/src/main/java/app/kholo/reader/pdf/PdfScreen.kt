@@ -142,7 +142,7 @@ fun PdfScreen(
                         onClose = viewModel::closeSearch,
                     )
                 } else {
-                    AppTopBar(title = doc.name, onBack = onBack, titleStyle = MaterialTheme.typography.titleMedium) {
+                    AppTopBar(title = stringResource(R.string.app_name), subtitle = doc.name, onBack = onBack) {
                         if (fullFeatures) {
                             IconButton(onClick = viewModel::openSearch) {
                                 Icon(
@@ -264,7 +264,12 @@ private fun BottomControls(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showPage) {
-            Surface(onClick = onPageClick, shape = MaterialTheme.shapes.small, tonalElevation = Spacing.xs) {
+            Surface(
+                onClick = onPageClick,
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shadowElevation = Spacing.xs,
+            ) {
                 Text(
                     text = stringResource(R.string.page_indicator, page + 1, pageCount),
                     modifier = Modifier.padding(horizontal = Spacing.m, vertical = Spacing.s),
@@ -275,7 +280,7 @@ private fun BottomControls(
             Box(Modifier)
         }
         if (showFit) {
-            Button(onClick = onFit) { Text(stringResource(R.string.action_fit)) }
+            Button(onClick = onFit, shape = MaterialTheme.shapes.small) { Text(stringResource(R.string.action_fit)) }
         }
     }
 }

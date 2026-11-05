@@ -2,9 +2,7 @@ package app.kholo.reader.pdf
 
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -44,8 +41,7 @@ import app.kholo.reader.R
 import app.kholo.reader.ui.components.AppTopBar
 import app.kholo.reader.ui.theme.Spacing
 
-private val ICON_CIRCLE = 72.dp
-private val ICON_SIZE = 32.dp
+private val ICON_SIZE = 36.dp
 private val FORM_MAX_WIDTH = 480.dp
 
 /** Password sirf memory me rehta hai. Screenshot aur recent apps preview band hain. */
@@ -60,7 +56,7 @@ fun PasswordScreen(name: String, failedAttempt: Boolean, onSubmit: (String) -> U
     var visible by remember { mutableStateOf(false) }
     val submit = { if (password.isNotEmpty()) onSubmit(password) }
     Scaffold(topBar = {
-        AppTopBar(title = name, onBack = onBack, titleStyle = MaterialTheme.typography.titleMedium)
+        AppTopBar(title = stringResource(R.string.app_name), subtitle = name, onBack = onBack)
     }) { padding ->
         Column(
             modifier = Modifier
@@ -72,19 +68,12 @@ fun PasswordScreen(name: String, failedAttempt: Boolean, onSubmit: (String) -> U
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.l),
         ) {
-            Box(
-                modifier = Modifier.size(
-                    ICON_CIRCLE,
-                ).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_lock),
-                    contentDescription = null,
-                    modifier = Modifier.size(ICON_SIZE),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
+            Icon(
+                painterResource(R.drawable.ic_lock),
+                contentDescription = null,
+                modifier = Modifier.size(ICON_SIZE),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Text(
                 text = stringResource(R.string.password_title),
                 style = MaterialTheme.typography.titleMedium,
@@ -118,6 +107,7 @@ fun PasswordScreen(name: String, failedAttempt: Boolean, onSubmit: (String) -> U
             Button(
                 onClick = submit,
                 enabled = password.isNotEmpty(),
+                shape = MaterialTheme.shapes.small,
                 modifier = Modifier.fillMaxWidth().widthIn(max = FORM_MAX_WIDTH),
             ) {
                 Text(stringResource(R.string.action_open))

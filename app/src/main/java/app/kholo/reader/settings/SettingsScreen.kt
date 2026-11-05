@@ -1,7 +1,6 @@
 package app.kholo.reader.settings
 
 import androidx.activity.compose.LocalActivity
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,10 +12,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,7 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kholo.reader.BuildConfig
 import app.kholo.reader.R
@@ -50,9 +48,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.screenPadding),
-            verticalArrangement = Arrangement.spacedBy(Spacing.m),
+                .verticalScroll(rememberScrollState()),
         ) {
             RadioSection(
                 title = stringResource(R.string.settings_theme),
@@ -73,7 +69,7 @@ fun SettingsScreen(settings: SettingsRepository, onBack: () -> Unit) {
             )
             Text(
                 text = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.s),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.l),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -103,34 +99,31 @@ private fun <T> RadioSection(
     label: @Composable (T) -> String,
     onSelect: (T) -> Unit,
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(Modifier.selectableGroup().padding(vertical = Spacing.s)) {
-            Text(
-                text = title,
-                modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.s),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            options.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = Spacing.minTouchTarget)
-                        .selectable(selected = option == selected, role = Role.RadioButton, onClick = {
-                            onSelect(option)
-                        })
-                        .padding(horizontal = Spacing.l),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.l),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = option == selected, onClick = null)
-                    Text(label(option), style = MaterialTheme.typography.bodyLarge)
-                }
+    Column(Modifier.selectableGroup().padding(vertical = Spacing.s)) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(horizontal = Spacing.screenPadding, vertical = Spacing.s),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        options.forEach { option ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Spacing.minTouchTarget)
+                    .selectable(
+                        selected = option == selected,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(option) },
+                    )
+                    .padding(horizontal = Spacing.screenPadding),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.l),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = option == selected, onClick = null)
+                Text(label(option), style = MaterialTheme.typography.bodyLarge)
             }
         }
     }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }

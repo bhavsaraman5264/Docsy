@@ -14,6 +14,7 @@ fun PrimaryAction(label: String, onClick: () -> Unit, modifier: Modifier = Modif
     ExtendedFloatingActionButton(
         onClick = onClick,
         modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.primary,
         contentColor = MaterialTheme.colorScheme.onPrimary,
         icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },

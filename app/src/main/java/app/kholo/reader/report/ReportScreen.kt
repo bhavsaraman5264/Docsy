@@ -68,6 +68,7 @@ fun ReportScreen(container: AppContainer, category: String, onBack: () -> Unit, 
                     onSend(report)
                 },
                 modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
             ) { Text(stringResource(R.string.action_send)) }
             Text(stringResource(R.string.report_preview), style = MaterialTheme.typography.titleSmall)
             Surface(

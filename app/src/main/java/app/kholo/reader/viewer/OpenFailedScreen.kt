@@ -29,7 +29,7 @@ fun OpenFailedScreen(
     onReport: () -> Unit,
 ) {
     Scaffold(topBar = {
-        AppTopBar(title = name.orEmpty(), onBack = onBack, titleStyle = MaterialTheme.typography.titleMedium)
+        AppTopBar(title = stringResource(R.string.app_name), subtitle = name, onBack = onBack)
     }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             ErrorState(error) {
@@ -38,9 +38,13 @@ fun OpenFailedScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     if (error != AppError.FileGone) {
-                        Button(onClick = onOpenElsewhere) { Text(stringResource(R.string.action_open_elsewhere)) }
+                        Button(onClick = onOpenElsewhere, shape = MaterialTheme.shapes.small) {
+                            Text(stringResource(R.string.action_open_elsewhere))
+                        }
                     }
-                    OutlinedButton(onClick = onReport) { Text(stringResource(R.string.action_report)) }
+                    OutlinedButton(onClick = onReport, shape = MaterialTheme.shapes.small) {
+                        Text(stringResource(R.string.action_report))
+                    }
                 }
             }
         }

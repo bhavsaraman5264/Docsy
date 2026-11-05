@@ -4,37 +4,84 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
+private val Ink = Color(0xFF1C1C1E)
+private val Paper = Color(0xFFFFFFFF)
+private val Mist = Color(0xFFF2F2F4)
+private val Line = Color(0xFFE5E5E7)
+private val Slate = Color(0xFF6B6B70)
+
+private val Night = Color(0xFF000000)
+private val Coal = Color(0xFF121214)
+private val Graphite = Color(0xFF1E1E20)
+private val Ash = Color(0xFF2C2C2E)
+private val Silver = Color(0xFFAEAEB2)
+private val Fog = Color(0xFFE5E5EA)
+
+/** Sirf safed aur syahi. Rang file type ke liye bachaya hai, Material ka baingani tint kahin nahi aana chahiye. */
 val LightColors = lightColorScheme(
-    primary = Color(0xFF1B5E9E),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD6E4F7),
-    onPrimaryContainer = Color(0xFF0F3A63),
-    secondaryContainer = Color(0xFFD6E4F7),
-    onSecondaryContainer = Color(0xFF0F3A63),
-    background = Color(0xFFF8F9FB),
-    onBackground = Color(0xFF1A1C1E),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1A1C1E),
-    onSurfaceVariant = Color(0xFF5A6068),
-    outlineVariant = Color(0xFFE1E4E9),
+    primary = Ink,
+    onPrimary = Paper,
+    primaryContainer = Mist,
+    onPrimaryContainer = Ink,
+    secondary = Slate,
+    onSecondary = Paper,
+    secondaryContainer = Mist,
+    onSecondaryContainer = Ink,
+    tertiary = Slate,
+    background = Paper,
+    onBackground = Ink,
+    surface = Paper,
+    onSurface = Ink,
+    surfaceVariant = Mist,
+    onSurfaceVariant = Slate,
+    surfaceTint = Paper,
+    surfaceContainerLowest = Paper,
+    surfaceContainerLow = Paper,
+    surfaceContainer = Paper,
+    surfaceContainerHigh = Mist,
+    surfaceContainerHighest = Mist,
+    outline = Slate,
+    outlineVariant = Line,
     error = Color(0xFFB3261E),
 )
 
+/** Black ke saath grey. */
 val DarkColors = darkColorScheme(
-    primary = Color(0xFFA6C8F5),
-    onPrimary = Color(0xFF00315C),
-    primaryContainer = Color(0xFF27425F),
-    onPrimaryContainer = Color(0xFFE3EEFB),
-    secondaryContainer = Color(0xFF27425F),
-    onSecondaryContainer = Color(0xFFE3EEFB),
-    background = Color(0xFF111316),
-    onBackground = Color(0xFFE3E5E8),
-    surface = Color(0xFF1B1E22),
-    onSurface = Color(0xFFE3E5E8),
-    onSurfaceVariant = Color(0xFFA5ABB3),
-    outlineVariant = Color(0xFF2C3036),
+    primary = Fog,
+    onPrimary = Ink,
+    primaryContainer = Ash,
+    onPrimaryContainer = Fog,
+    secondary = Silver,
+    onSecondary = Ink,
+    secondaryContainer = Ash,
+    onSecondaryContainer = Fog,
+    tertiary = Silver,
+    background = Night,
+    onBackground = Fog,
+    surface = Coal,
+    onSurface = Fog,
+    surfaceVariant = Graphite,
+    onSurfaceVariant = Silver,
+    surfaceTint = Coal,
+    surfaceContainerLowest = Night,
+    surfaceContainerLow = Coal,
+    surfaceContainer = Coal,
+    surfaceContainerHigh = Graphite,
+    surfaceContainerHighest = Ash,
+    outline = Silver,
+    outlineVariant = Ash,
     error = Color(0xFFFFB4AB),
 )
 
-val ReaderBackgroundLight = Color(0xFFE6E8EC)
-val ReaderBackgroundDark = Color(0xFF0B0C0E)
+val ReaderBackgroundLight = Color(0xFFEDEDEF)
+val ReaderBackgroundDark = Night
+val FavoriteStar = Color(0xFFE8A200)
+
+/** File type ka rang: dekhte hi pata chale kaunsi file hai. */
+fun fileTypeColor(label: String, dark: Boolean): Color = when (label) {
+    "PDF" -> if (dark) Color(0xFFFF8A80) else Color(0xFFC62828)
+    "DOC" -> if (dark) Color(0xFF8AB4F8) else Color(0xFF1A5FB4)
+    "XLS" -> if (dark) Color(0xFF81C995) else Color(0xFF1B7F3B)
+    "PPT" -> if (dark) Color(0xFFFDB57A) else Color(0xFFB95000)
+    else -> if (dark) Silver else Slate
+}

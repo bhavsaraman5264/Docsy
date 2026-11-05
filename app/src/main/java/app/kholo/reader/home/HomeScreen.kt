@@ -4,7 +4,6 @@ import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,6 +49,7 @@ import app.kholo.reader.ui.components.AppTopBar
 import app.kholo.reader.ui.components.EmptyState
 import app.kholo.reader.ui.components.FileRow
 import app.kholo.reader.ui.components.PrimaryAction
+import app.kholo.reader.ui.theme.FavoriteStar
 import app.kholo.reader.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
@@ -163,14 +163,7 @@ private fun FileGrid(
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = Spacing.screenPadding,
-            end = Spacing.screenPadding,
-            top = Spacing.m,
-            bottom = LIST_BOTTOM_PADDING,
-        ),
-        verticalArrangement = Arrangement.spacedBy(Spacing.s),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING),
     ) {
         items(files, key = { it.uri }) { file ->
             RecentRow(file, onOpen, onShare, viewModel)
@@ -221,7 +214,9 @@ private fun EmptyHome(tab: HomeTab, onPickFile: () -> Unit) {
             title = stringResource(R.string.home_empty_title),
             subtitle = stringResource(R.string.home_empty_hint),
         ) {
-            Button(onClick = onPickFile) { Text(stringResource(R.string.action_open_file)) }
+            Button(onClick = onPickFile, shape = MaterialTheme.shapes.small) {
+                Text(stringResource(R.string.action_open_file))
+            }
         }
     }
 }
@@ -246,7 +241,7 @@ private fun RecentRow(
                     if (file.favorite) R.string.action_unfavorite else R.string.action_favorite,
                 ),
                 tint = if (file.favorite) {
-                    MaterialTheme.colorScheme.primary
+                    FavoriteStar
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },

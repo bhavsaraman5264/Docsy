@@ -7,7 +7,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,9 +30,9 @@ fun DocumentScaffold(
     Scaffold(
         topBar = {
             AppTopBar(
-                title = title,
+                title = stringResource(R.string.app_name),
+                subtitle = title,
                 onBack = actions.onBack,
-                titleStyle = MaterialTheme.typography.titleMedium,
             ) {
                 barActions()
                 var open by remember { mutableStateOf(false) }

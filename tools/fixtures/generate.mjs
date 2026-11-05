@@ -268,3 +268,10 @@ write('long.docx', zip({
   'word/styles.xml': `${X}<w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:styleId="Heading1"><w:name w:val="heading 1"/><w:rPr><w:b/><w:color w:val="1F4E79"/><w:sz w:val="32"/></w:rPr></w:style></w:styles>`,
   'word/document.xml': `${X}<w:document ${W}><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/><w:jc w:val="center"/></w:pPr><w:r><w:t>Centered blue heading</w:t></w:r></w:p>${manyParas}<w:tbl><w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="7000"/></w:tblGrid><w:tr>${shaded('Name')}${shaded('Detail')}</w:tr>${manyRows}</w:tbl><w:p><w:r><w:br w:type="page"/></w:r></w:p>${para('After forced page break')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`,
 }));
+
+// Word me negative indent aur ajeeb margin aam hain. Asli report se aaya crash isi se pakda jata hai.
+write('negative-indent.docx', zip({
+  '[Content_Types].xml': `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`,
+  '_rels/.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/></Relationships>`,
+  'word/document.xml': `${X}<w:document ${W}><w:body><w:p><w:pPr><w:spacing w:before="-120" w:after="-60"/><w:ind w:left="-720"/></w:pPr><w:r><w:t>Outdented paragraph</w:t></w:r></w:p>${para('Normal paragraph')}<w:tbl><w:tblGrid><w:gridCol w:w="-50"/><w:gridCol w:w="4000"/></w:tblGrid><w:tr>${cell('A')}${cell('B')}</w:tr></w:tbl><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="-100" w:right="9000" w:bottom="1440" w:left="9000"/></w:sectPr></w:body></w:document>`,
+}));

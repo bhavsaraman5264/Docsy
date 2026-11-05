@@ -11,7 +11,32 @@ data class PageSetup(
     val marginRight: Float = 72f,
     val marginTop: Float = 72f,
     val marginBottom: Float = 72f,
-)
+) {
+    /** Word me negative aur page se bade margin mil sakte hain. Layout ko hamesha sahi values milen. */
+    fun sanitized(): PageSetup {
+        val defaults = PageSetup()
+        val safeWidth = if (width > 0f) width else defaults.width
+        val safeHeight = if (height > 0f) height else defaults.height
+        val left = marginLeft.coerceAtLeast(0f)
+        val right = marginRight.coerceAtLeast(0f)
+        val top = marginTop.coerceAtLeast(0f)
+        val bottom = marginBottom.coerceAtLeast(0f)
+        val sidesFit = left + right < safeWidth * MAX_MARGIN_SHARE
+        val endsFit = top + bottom < safeHeight * MAX_MARGIN_SHARE
+        return PageSetup(
+            width = safeWidth,
+            height = safeHeight,
+            marginLeft = if (sidesFit) left else defaults.marginLeft,
+            marginRight = if (sidesFit) right else defaults.marginRight,
+            marginTop = if (endsFit) top else defaults.marginTop,
+            marginBottom = if (endsFit) bottom else defaults.marginBottom,
+        )
+    }
+
+    private companion object {
+        const val MAX_MARGIN_SHARE = 0.8f
+    }
+}
 
 class DocCell(val text: String, val rich: AnnotatedString, val fill: String?)
 

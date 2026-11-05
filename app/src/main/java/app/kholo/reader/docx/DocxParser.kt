@@ -73,7 +73,7 @@ class DocxParser(private val zip: SafeZip) {
                             }
                             depth++
                         }
-                        "gridCol" -> if (depth == 1) grid += twips(parser.attr("w"))
+                        "gridCol" -> if (depth == 1) grid += distance(parser.attr("w"))
                         "tr" -> if (depth == 1) row = mutableListOf()
                         "tc" -> if (depth == 1) {
                             cellText.clear()
@@ -124,12 +124,15 @@ class DocxParser(private val zip: SafeZip) {
                 }
             }
         }
-        return ParsedDocument(blocks, page)
+        return ParsedDocument(blocks, page.sanitized())
     }
 
     private fun Float.ifZero(other: Float) = if (this > 0f) this else other
 
     private fun twips(value: String?): Float = (value?.toFloatOrNull() ?: 0f) / TWIPS_PER_POINT
+
+    /** Negative indent Word me valid hai (margin se bahar), par layout me jagah negative nahi ho sakti. */
+    private fun distance(value: String?): Float = twips(value).coerceAtLeast(0f)
 
     private class ParagraphState {
         var styleId: String? = null
@@ -165,10 +168,13 @@ class DocxParser(private val zip: SafeZip) {
                         "ilvl" -> state.level = parser.attr("val")?.toIntOrNull() ?: 0
                         "jc" -> state.align = alignOf(parser.attr("val"))
                         "spacing" -> if (inParagraphProps) {
-                            state.before = twips(parser.attr("before"))
-                            state.after = twips(parser.attr("after"))
+                            state.before = distance(parser.attr("before"))
+                            state.after = distance(parser.attr("after"))
                         }
-                        "ind" -> if (inParagraphProps) state.left = twips(parser.attr("left"))
+                        "ind" -> if (inParagraphProps) {
+                            state.left =
+                                distance(parser.attr("left") ?: parser.attr("start"))
+                        }
                         "r" -> run = Run()
                         "rPr" -> inRunProps = !inParagraphProps
                         "b" -> if (inRunProps) run.props = run.props.copy(bold = isOn(parser))

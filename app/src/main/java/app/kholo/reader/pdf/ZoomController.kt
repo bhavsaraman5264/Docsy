@@ -1,12 +1,14 @@
 package app.kholo.reader.pdf
 
 import android.graphics.RectF
+import android.os.RemoteException
 import android.util.SparseArray
 import androidx.pdf.PdfDocument
 import androidx.pdf.PdfPoint
 import androidx.pdf.view.PdfView
 import app.kholo.reader.core.log.AppLog
 import app.kholo.reader.core.log.LogTag
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -45,11 +47,25 @@ class ZoomController(
         view.addOnFirstContentLoadListener(
             object : PdfView.OnFirstContentLoadListener {
                 override fun onFirstContentLoad() {
-                    scope.launch { open() }
+                    scope.launch { guarded { open() } }
                 }
             },
         )
-        scope.launch { loadPageWidths() }
+        scope.launch { guarded { loadPageWidths() } }
+    }
+
+    /** Engine ka process band ho jaye to zoom ka extra kaam ruk jaye, app nahi. */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun guarded(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: RuntimeException) {
+            AppLog.w(LogTag.ZOOM) { "page info failed ${e.javaClass.simpleName}" }
+        } catch (e: RemoteException) {
+            AppLog.w(LogTag.ZOOM) { "page info failed ${e.javaClass.simpleName}" }
+        }
     }
 
     private suspend fun open() {

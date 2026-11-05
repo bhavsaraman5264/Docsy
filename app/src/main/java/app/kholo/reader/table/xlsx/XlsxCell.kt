@@ -4,11 +4,16 @@ import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 private const val LETTER_BASE = 26
 private const val SECONDS_IN_DAY = 86_400.0
 private const val LOTUS_BUG_SERIAL = 60
 private const val MAX_COLUMN = 16_384
+private const val MAX_PLAIN_DIGITS = 400
+
+/** Excel ki aakhri date, 31-12-9999. */
+private const val MAX_DATE_SERIAL = 2_958_465.0
 
 object XlsxCell {
     /** `C5` se 0-based column. Kharab reference par -1. */
@@ -23,13 +28,18 @@ object XlsxCell {
 
     /** Bade number aur Aadhaar jaise 12 digit kabhi `1.2E+11` na dikhen. */
     fun plainNumber(raw: String): String = try {
-        if ('E' in raw || 'e' in raw) BigDecimal(raw).toPlainString() else raw
+        val scientific = 'E' in raw || 'e' in raw
+        val value = if (scientific) BigDecimal(raw) else null
+        // 1E999999999 ko likhne me memory khatam ho jati, aise number jaise hain waise hi dikhao.
+        if (value != null && abs(value.scale()) <= MAX_PLAIN_DIGITS) value.toPlainString() else raw
     } catch (_: NumberFormatException) {
+        raw
+    } catch (_: ArithmeticException) {
         raw
     }
 
     fun date(raw: String, date1904: Boolean): String {
-        val serial = raw.toDoubleOrNull() ?: return raw
+        val serial = raw.toDoubleOrNull()?.takeIf { it in 0.0..MAX_DATE_SERIAL } ?: return raw
         val days = serial.toLong()
         val base = when {
             date1904 -> LocalDate.of(1904, 1, 1)

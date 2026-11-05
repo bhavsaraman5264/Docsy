@@ -45,6 +45,10 @@ class DocxViewModel(
                 LoadState.Failed(e.toAppError())
             } catch (_: XmlPullParserException) {
                 LoadState.Failed(AppError.Corrupt)
+            } catch (_: IllegalArgumentException) {
+                LoadState.Failed(AppError.Corrupt)
+            } catch (_: IndexOutOfBoundsException) {
+                LoadState.Failed(AppError.Corrupt)
             }
         }
     }
@@ -66,6 +70,8 @@ class DocxViewModel(
             while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_IMAGE_SIDE) sample *= 2
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
         } catch (_: IOException) {
+            null
+        } catch (_: IllegalArgumentException) {
             null
         }
     }

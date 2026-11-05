@@ -1,6 +1,7 @@
 package app.kholo.reader.table.xlsx
 
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
 import app.kholo.reader.core.file.SafeZip
 import app.kholo.reader.core.file.attr
 import app.kholo.reader.core.file.safeXml
@@ -74,6 +75,12 @@ class XlsxSqliteSource(
                 _info.update { it.copy(finished = true, failed = true) }
             } catch (_: XmlPullParserException) {
                 _info.update { it.copy(finished = true, failed = true) }
+            } catch (_: SQLiteException) {
+                _info.update { it.copy(finished = true, failed = true) }
+            } catch (_: IllegalStateException) {
+                _info.update { it.copy(finished = true, failed = true) }
+            } finally {
+                if (db.isOpen && db.inTransaction()) db.endTransaction()
             }
         }
     }
@@ -215,8 +222,18 @@ class XlsxSqliteSource(
         }
     }
 
+    /** Import ke rukne ke baad hi band karo, warna band database par crash hota. */
     override fun close() {
-        job?.cancel()
+        val running = job
+        if (running == null) {
+            release()
+        } else {
+            running.cancel()
+            running.invokeOnCompletion { release() }
+        }
+    }
+
+    private fun release() {
         db.close()
         strings.close()
         zip.close()

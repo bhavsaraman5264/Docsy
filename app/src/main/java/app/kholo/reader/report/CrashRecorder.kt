@@ -11,14 +11,14 @@ private const val MAX_FRAMES = 40
  * Crash ki chhoti report private storage me likhta hai, phir default handler chalata hai, taaki
  * Android vitals ko bhi crash mile. Exception ka message nahi likhte, usme URI ya file naam ho sakta hai.
  */
-class CrashRecorder(context: Context) {
+class CrashRecorder(context: Context, private val recentEvents: () -> List<String> = { emptyList() }) {
     private val file = File(context.applicationContext.filesDir, FILE_NAME)
 
     fun install() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             try {
-                file.writeText(safeTrace(error))
+                file.writeText(safeTrace(error) + "\nLast events:\n" + recentEvents().joinToString("\n"))
             } catch (_: IOException) {
                 // Crash ke beech report na likhi jaye to bhi crash ko aage jane do.
             }

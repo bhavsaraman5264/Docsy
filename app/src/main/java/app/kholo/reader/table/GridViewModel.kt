@@ -1,5 +1,6 @@
 package app.kholo.reader.table
 
+import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.util.LruCache
 import androidx.lifecycle.ViewModel
@@ -62,6 +63,12 @@ class GridViewModel(
                 LoadState.Failed(AppError.FileGone)
             } catch (_: XmlPullParserException) {
                 LoadState.Failed(AppError.Corrupt)
+            } catch (_: IllegalArgumentException) {
+                LoadState.Failed(AppError.Corrupt)
+            } catch (_: IndexOutOfBoundsException) {
+                LoadState.Failed(AppError.Corrupt)
+            } catch (_: SQLiteException) {
+                LoadState.Failed(AppError.NoSpace)
             }
         }
     }
@@ -124,6 +131,8 @@ class GridViewModel(
             } catch (_: IOException) {
                 emptyList()
             } catch (_: IllegalStateException) {
+                emptyList()
+            } catch (_: SQLiteException) {
                 emptyList()
             }
             withContext(container.dispatchers.main) {

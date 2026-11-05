@@ -275,3 +275,15 @@ write('negative-indent.docx', zip({
   '_rels/.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/></Relationships>`,
   'word/document.xml': `${X}<w:document ${W}><w:body><w:p><w:pPr><w:spacing w:before="-120" w:after="-60"/><w:ind w:left="-720"/></w:pPr><w:r><w:t>Outdented paragraph</w:t></w:r></w:p>${para('Normal paragraph')}<w:tbl><w:tblGrid><w:gridCol w:w="-50"/><w:gridCol w:w="4000"/></w:tblGrid><w:tr>${cell('A')}${cell('B')}</w:tr></w:tbl><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="-100" w:right="9000" w:bottom="1440" w:left="9000"/></w:sectPr></w:body></w:document>`,
 }));
+
+// Jaan-boojh kar kharab values: app inme crash nahi hona chahiye.
+write('hostile.docx', zip({
+  '[Content_Types].xml': `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>`,
+  'word/document.xml': `${X}<w:document ${W}><w:body><w:p><w:pPr><w:spacing w:before="NaN" w:after="Infinity"/><w:ind w:left="NaN"/><w:numPr><w:ilvl w:val="-3"/><w:numId w:val="9"/></w:numPr></w:pPr><w:r><w:rPr><w:sz w:val="-4"/><w:color w:val="zzzz"/></w:rPr><w:t>Hostile values</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="999999999" w:h="NaN"/></w:sectPr></w:body></w:document>`,
+}));
+write('hostile.xlsx', zip(wbFiles(['Bad'], {
+  'xl/styles.xml': `${X}<styleSheet ${S}><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>`,
+  'xl/worksheets/sheet1.xml': `${X}<worksheet ${S}><sheetData><row r="1"><c r="A1" s="1"><v>9.9E99</v></c><c r="B1"><v>1E999999999</v></c><c r="C1" t="s"><v>77</v></c><c r="ZZZZ1"><v>1</v></c></row></sheetData></worksheet>`,
+})));
+const emptyPdf = latin('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Count 0 /Kids [] >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n');
+write('zero-pages.pdf', emptyPdf);

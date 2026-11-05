@@ -15,8 +15,8 @@ data class PageSetup(
     /** Word me negative aur page se bade margin mil sakte hain. Layout ko hamesha sahi values milen. */
     fun sanitized(): PageSetup {
         val defaults = PageSetup()
-        val safeWidth = if (width > 0f) width else defaults.width
-        val safeHeight = if (height > 0f) height else defaults.height
+        val safeWidth = if (width > 0f && width <= MAX_PAGE_PT) width else defaults.width
+        val safeHeight = if (height > 0f && height <= MAX_PAGE_PT) height else defaults.height
         val left = marginLeft.coerceAtLeast(0f)
         val right = marginRight.coerceAtLeast(0f)
         val top = marginTop.coerceAtLeast(0f)
@@ -35,6 +35,9 @@ data class PageSetup(
 
     private companion object {
         const val MAX_MARGIN_SHARE = 0.8f
+
+        /** Word ka sabse bada page 22 inch hota hai. */
+        const val MAX_PAGE_PT = 1584f
     }
 }
 

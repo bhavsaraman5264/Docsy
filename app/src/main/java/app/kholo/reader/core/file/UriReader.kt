@@ -77,6 +77,8 @@ class UriReader(context: Context) {
         DocumentType.Unknown
     } catch (_: SecurityException) {
         DocumentType.Unknown
+    } catch (_: IllegalArgumentException) {
+        DocumentType.Unknown
     }
 
     /** File picker se mili access app restart ke baad bhi rahe, taaki recent list se file khul sake. */

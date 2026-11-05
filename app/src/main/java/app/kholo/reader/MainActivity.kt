@@ -123,10 +123,12 @@ class MainActivity : ComponentActivity() {
         open(uri)
     }
 
+    /**
+     * Viewer isi app ka hai, isliye URI grant ki zaroorat nahi. Grant flag lagane par expire hua
+     * WhatsApp URI yahin crash karta tha. Ab viewer khud saaf message dikhata hai.
+     */
     private fun open(uri: Uri) {
-        val intent = Intent(Intent.ACTION_VIEW, uri, this, ViewerActivity::class.java)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        startActivity(intent)
+        startActivity(Intent(Intent.ACTION_VIEW, uri, this, ViewerActivity::class.java))
     }
 
     private fun share(uri: Uri) {

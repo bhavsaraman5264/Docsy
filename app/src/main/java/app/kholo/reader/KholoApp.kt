@@ -21,7 +21,9 @@ class KholoApp : Application() {
         val hooks = DebugHooksImpl()
         AppLog.plant(reportBuffer, hooks.logTree)
         hooks.onAppCreate(this)
-        val crashRecorder = CrashRecorder(this).also { it.install() }
+        val crashRecorder = CrashRecorder(this) {
+            reportBuffer.snapshot().map { "${it.timeMillis} ${it.level} ${it.tag} ${it.message}" }
+        }.also { it.install() }
         container = AppContainer(this, reportBuffer, crashRecorder)
         // Pichhli baar band ho gaye viewer ki temp files na bachen.
         container.tempFiles.let { temp -> Thread { temp.clearAll() }.start() }

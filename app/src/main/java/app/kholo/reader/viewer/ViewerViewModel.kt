@@ -94,6 +94,11 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
     }
 
     private suspend fun ready(opened: PdfDocument, name: String) {
+        if (opened.pageCount <= 0) {
+            closeQuietly(opened)
+            fail(AppError.Corrupt, name)
+            return
+        }
         document = opened
         val key = fileIdentity(uri.toString(), name, info?.size ?: 0L)
         val reading = container.readingState.load(key)
@@ -122,11 +127,18 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
         _state.value = ViewerUiState.Failed(error, name)
     }
 
-    override fun onCleared() {
+    @Suppress("TooGenericExceptionCaught") // Engine ka process band ho chuka ho to close kuch bhi phenk sakta hai.
+    private fun closeQuietly(target: PdfDocument) {
         try {
-            document?.close()
+            target.close()
         } catch (_: IOException) {
             AppLog.w(LogTag.PDF) { "close failed" }
+        } catch (_: RuntimeException) {
+            AppLog.w(LogTag.PDF) { "close failed" }
         }
+    }
+
+    override fun onCleared() {
+        document?.let(::closeQuietly)
     }
 }

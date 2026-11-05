@@ -43,4 +43,11 @@ class XlsxCellTest {
     fun `excel escapes are decoded`() {
         assertEquals("a\rb", SharedStringsFile.decodeEscapes("a_x000D_b"))
     }
+
+    @Test
+    fun `impossible dates and huge numbers stay as raw text`() {
+        assertEquals("9.9E99", XlsxCell.date("9.9E99", date1904 = false))
+        assertEquals("-5", XlsxCell.date("-5", date1904 = false))
+        assertEquals("1E999999999", XlsxCell.plainNumber("1E999999999"))
+    }
 }

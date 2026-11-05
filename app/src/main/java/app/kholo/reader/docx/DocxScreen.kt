@@ -56,6 +56,9 @@ import kotlinx.coroutines.launch
 private val READING_WIDTH = 680.dp
 private val CELL_WIDTH = 160.dp
 private const val DEFAULT_FONT_SP = 16
+
+/** Page view saare blocks ek saath banata hai. Isse lambi file Read view me hi tez rehti hai. */
+private const val MAX_PAGE_VIEW_BLOCKS = 4000
 private const val MIN_FONT_SP = 12
 private const val MAX_FONT_SP = 28
 private const val FONT_STEP = 2
@@ -101,7 +104,7 @@ fun DocxScreen(
                 CircularProgressIndicator()
             }
             is LoadState.Failed -> actions.failed(current.error)
-            is LoadState.Ready -> if (showPage) {
+            is LoadState.Ready -> if (showPage && current.value.blocks.size <= MAX_PAGE_VIEW_BLOCKS) {
                 DocxPageView(current.value, viewModel, modifier)
             } else {
                 Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {

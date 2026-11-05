@@ -30,4 +30,9 @@ class PageSetupTest {
     fun `a normal page is left alone`() {
         assertEquals(PageSetup(), PageSetup().sanitized())
     }
+
+    @Test
+    fun `an absurd page size falls back to the default`() {
+        assertEquals(PageSetup().width, PageSetup(width = 50_000_000f).sanitized().width, 0f)
+    }
 }

@@ -1,6 +1,7 @@
 package app.kholo.reader.recents
 
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 private const val MAX_RECENTS = 100
@@ -78,6 +79,14 @@ internal fun List<RecentFile>.toJson(): String = JSONArray().also { array ->
 /** Purani saved list me duplicate ho sakte hain, isliye padhte waqt bhi saaf karte hain. */
 internal fun recentsFromJson(json: String?): List<RecentFile> {
     if (json.isNullOrEmpty()) return emptyList()
+    return try {
+        parseRecents(json)
+    } catch (_: JSONException) {
+        emptyList()
+    }
+}
+
+private fun parseRecents(json: String): List<RecentFile> {
     val array = JSONArray(json)
     return List(array.length()) { index ->
         val item = array.getJSONObject(index)

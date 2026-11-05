@@ -6,6 +6,7 @@ import androidx.pdf.PdfDocument
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.log.AppLog
 import app.kholo.reader.core.log.LogTag
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,7 +75,19 @@ class PdfViewModel(
         if (query.isBlank()) return
         searchJob = viewModelScope.launch {
             delay(SEARCH_DEBOUNCE_MS)
+            safeSearch(query)
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Purana engine ya band hua process kuch bhi phenk sakta hai.
+    private suspend fun safeSearch(query: String) {
+        try {
             runSearch(query)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: RuntimeException) {
+            AppLog.w(LogTag.PDF) { "search failed ${e.javaClass.simpleName}" }
+            _state.update { state -> state.copy(search = state.search?.copy(searching = false)) }
         }
     }
 

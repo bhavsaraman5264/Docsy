@@ -22,6 +22,8 @@ private const val TWIPS_PER_POINT = 20f
 private const val HALF_POINTS = 2f
 private const val EMU_PER_POINT = 12_700f
 private const val DEFAULT_SIZE_PT = 11f
+private const val MAX_FONT_PT = 200f
+private const val MAX_LIST_LEVEL = 8
 private const val HEX_RADIX = 16
 private const val OPAQUE = 0xFF000000L
 
@@ -129,7 +131,10 @@ class DocxParser(private val zip: SafeZip) {
 
     private fun Float.ifZero(other: Float) = if (this > 0f) this else other
 
-    private fun twips(value: String?): Float = (value?.toFloatOrNull() ?: 0f) / TWIPS_PER_POINT
+    private fun twips(value: String?): Float = number(value) / TWIPS_PER_POINT
+
+    /** `NaN` aur `Infinity` bhi Float ban jate hain, par layout me crash karte hain. */
+    private fun number(value: String?): Float = value?.toFloatOrNull()?.takeIf { it.isFinite() } ?: 0f
 
     /** Negative indent Word me valid hai (margin se bahar), par layout me jagah negative nahi ho sakti. */
     private fun distance(value: String?): Float = twips(value).coerceAtLeast(0f)
@@ -165,7 +170,7 @@ class DocxParser(private val zip: SafeZip) {
                         "pPr" -> inParagraphProps = true
                         "pStyle" -> state.styleId = parser.attr("val")
                         "numId" -> state.numId = parser.attr("val")
-                        "ilvl" -> state.level = parser.attr("val")?.toIntOrNull() ?: 0
+                        "ilvl" -> state.level = (parser.attr("val")?.toIntOrNull() ?: 0).coerceIn(0, MAX_LIST_LEVEL)
                         "jc" -> state.align = alignOf(parser.attr("val"))
                         "spacing" -> if (inParagraphProps) {
                             state.before = distance(parser.attr("before"))
@@ -194,7 +199,7 @@ class DocxParser(private val zip: SafeZip) {
                             rich.append('\n')
                         }
                         "lastRenderedPageBreak" -> state.pageBreakBefore = true
-                        "extent" -> state.imageWidth = (parser.attr("cx")?.toFloatOrNull() ?: 0f) / EMU_PER_POINT
+                        "extent" -> state.imageWidth = number(parser.attr("cx")).coerceAtLeast(0f) / EMU_PER_POINT
                         "blip" -> parser.attr("embed")?.let(rels::get)?.let {
                             blocks +=
                                 DocBlock.Image(it, state.imageWidth)
@@ -234,7 +239,8 @@ class DocxParser(private val zip: SafeZip) {
 
     private fun isOn(parser: XmlPullParser): Boolean = parser.attr("val") !in setOf("0", "false")
 
-    private fun halfPoints(value: String?): Float? = value?.toFloatOrNull()?.div(HALF_POINTS)
+    private fun halfPoints(value: String?): Float? =
+        number(value).takeIf { it > 0f }?.div(HALF_POINTS)?.coerceAtMost(MAX_FONT_PT)
 
     private fun alignOf(value: String?): TextAlign = when (value) {
         "center" -> TextAlign.Center

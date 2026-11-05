@@ -23,5 +23,7 @@ class KholoApp : Application() {
         hooks.onAppCreate(this)
         val crashRecorder = CrashRecorder(this).also { it.install() }
         container = AppContainer(this, reportBuffer, crashRecorder)
+        // Pichhli baar band ho gaye viewer ki temp files na bachen.
+        container.tempFiles.let { temp -> Thread { temp.clearAll() }.start() }
     }
 }

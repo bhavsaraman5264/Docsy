@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private val MODERN_OFFICE = setOf("docx", "xlsx", "xlsm", "pptx")
+
 class ViewerViewModel(private val uri: Uri, private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow<ViewerUiState>(ViewerUiState.Loading)
     val state: StateFlow<ViewerUiState> = _state.asStateFlow()
@@ -41,13 +43,37 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
 
     private suspend fun route(file: FileInfo) {
         info = file
-        val type = DocumentType.detect(file.head, file.name, file.mime)
+        val type = detect(file)
         AppLog.i(LogTag.OPEN) { "open type=$type mime=${file.mime} size=${file.size}" }
         when (type) {
             DocumentType.Pdf -> openPdf(password = null)
+            DocumentType.Text, DocumentType.Csv, DocumentType.Docx, DocumentType.Xlsx, DocumentType.Pptx ->
+                readyOther(type, file)
             DocumentType.Empty -> fail(AppError.Empty, file.name)
-            else -> fail(AppError.Unsupported, file.name)
+            DocumentType.LegacyOffice -> fail(legacyError(file.name), file.name)
+            DocumentType.Unknown -> fail(AppError.Unsupported, file.name)
         }
+    }
+
+    private suspend fun detect(file: FileInfo): DocumentType {
+        val type = DocumentType.detect(file.head, file.name, file.mime)
+        val isZip = file.head.size > 1 && file.head[0] == 'P'.code.toByte() && file.head[1] == 'K'.code.toByte()
+        if (type != DocumentType.Unknown || !isZip) return type
+        return withContext(container.dispatchers.io) { container.uriReader.zipType(uri) }
+    }
+
+    /** `.xlsx` naam ki OLE2 file asal me password wali hoti hai, kharab nahi. */
+    private fun legacyError(name: String?): AppError {
+        val extension = name?.substringAfterLast('.', "")?.lowercase()
+        return if (extension in MODERN_OFFICE) AppError.OfficePassword else AppError.Unsupported
+    }
+
+    private suspend fun readyOther(type: DocumentType, file: FileInfo) {
+        val name = file.name.orEmpty()
+        container.recents.record(
+            RecentFile(uri.toString(), name, file.size ?: 0L, type.label, System.currentTimeMillis()),
+        )
+        _state.value = ViewerUiState.Other(type, uri, name, file.size)
     }
 
     fun submitPassword(password: String) {

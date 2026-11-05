@@ -7,10 +7,13 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import app.kholo.reader.core.AppError
 import app.kholo.reader.core.DocResult
+import app.kholo.reader.open.DocumentType
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.util.zip.ZipInputStream
 
 private const val HEAD_BYTES = 1100
+private const val MAX_SNIFF_ENTRIES = 50
 
 data class FileInfo(val name: String?, val size: Long?, val mime: String?, val head: ByteArray) {
     override fun equals(other: Any?): Boolean = other is FileInfo && name == other.name && size == other.size
@@ -58,6 +61,22 @@ class UriReader(context: Context) {
         val name = if (nameColumn >= 0) row.getString(nameColumn) else null
         val size = if (sizeColumn >= 0 && !row.isNull(sizeColumn)) row.getLong(sizeColumn) else null
         return name to size
+    }
+
+    /** Naam ke bina aayi ZIP (jaise WhatsApp se) kis tarah ki Office file hai. */
+    fun zipType(uri: Uri): DocumentType = try {
+        resolver.openInputStream(uri)?.use { stream ->
+            ZipInputStream(stream).use { zip ->
+                generateSequence { zip.nextEntry }
+                    .take(MAX_SNIFF_ENTRIES)
+                    .map { DocumentType.fromZipEntry(it.name) }
+                    .firstOrNull { it != DocumentType.Unknown }
+            }
+        } ?: DocumentType.Unknown
+    } catch (_: IOException) {
+        DocumentType.Unknown
+    } catch (_: SecurityException) {
+        DocumentType.Unknown
     }
 
     /** File picker se mili access app restart ke baad bhi rahe, taaki recent list se file khul sake. */

@@ -1,9 +1,11 @@
 package app.kholo.reader.core
 
+import android.content.ContentResolver
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import app.kholo.reader.core.file.TempFiles
 import app.kholo.reader.core.file.UriReader
 import app.kholo.reader.core.log.RingBufferTree
 import app.kholo.reader.pdf.PdfOpener
@@ -24,6 +26,8 @@ class AppContainer(
 ) {
     private val store = context.applicationContext.appStore
     val uriReader = UriReader(context)
+    val tempFiles = TempFiles(context)
+    val contentResolver: ContentResolver = context.applicationContext.contentResolver
     val recents = RecentsRepository(store)
     val settings = SettingsRepository(store)
     val readingState = ReadingStateStore(store)

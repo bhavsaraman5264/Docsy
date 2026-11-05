@@ -51,7 +51,7 @@ class ViewerActivity : ComponentActivity() {
 
     private fun share(uri: Uri) {
         val send = Intent(Intent.ACTION_SEND)
-            .setType(contentResolver.getType(uri) ?: PDF_MIME)
+            .setType(contentResolver.getType(uri) ?: ANY_MIME)
             .putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         launch(Intent.createChooser(send, null))
@@ -59,7 +59,7 @@ class ViewerActivity : ComponentActivity() {
 
     private fun openElsewhere(uri: Uri) {
         val view = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, contentResolver.getType(uri) ?: PDF_MIME)
+            .setDataAndType(uri, contentResolver.getType(uri) ?: ANY_MIME)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         val chooser = Intent.createChooser(view, null).putExtra(
             Intent.EXTRA_EXCLUDE_COMPONENTS,
@@ -88,6 +88,6 @@ class ViewerActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val PDF_MIME = "application/pdf"
+        const val ANY_MIME = "*/*"
     }
 }

@@ -13,6 +13,7 @@ enum class DocumentType {
     Csv,
     Docx,
     Xlsx,
+    Pptx,
 
     /** Purani DOC/XLS/PPT, ya password wali Office file. Dono OLE2 hoti hain. */
     LegacyOffice,
@@ -20,7 +21,27 @@ enum class DocumentType {
     Unknown,
     ;
 
+    /** Recent list ka chhota naam. */
+    val label: String
+        get() = when (this) {
+            Pdf -> "PDF"
+            Text -> "TXT"
+            Csv -> "CSV"
+            Docx -> "DOC"
+            Xlsx -> "XLS"
+            Pptx -> "PPT"
+            else -> "FILE"
+        }
+
     companion object {
+        /** Office file ka naam ya MIME nahi mila to ZIP ke andar ke folder se pehchan. */
+        fun fromZipEntry(name: String): DocumentType = when {
+            name.startsWith("word/") -> Docx
+            name.startsWith("xl/") -> Xlsx
+            name.startsWith("ppt/") -> Pptx
+            else -> Unknown
+        }
+
         /** File ke bytes extension se upar hain: `.csv` naam ki PDF, PDF hi khulegi. */
         fun detect(head: ByteArray, name: String?, mime: String?): DocumentType {
             if (head.isEmpty()) return Empty
@@ -38,6 +59,7 @@ enum class DocumentType {
         private fun zipType(extension: String, mime: String?): DocumentType = when {
             extension == "docx" || mime?.contains("wordprocessingml") == true -> Docx
             extension == "xlsx" || extension == "xlsm" || mime?.contains("spreadsheetml") == true -> Xlsx
+            extension == "pptx" || mime?.contains("presentationml") == true -> Pptx
             else -> Unknown
         }
     }

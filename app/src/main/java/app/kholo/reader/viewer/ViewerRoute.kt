@@ -14,8 +14,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.kholo.reader.core.AppContainer
+import app.kholo.reader.docx.DocxScreen
+import app.kholo.reader.open.DocumentType
 import app.kholo.reader.pdf.PasswordScreen
 import app.kholo.reader.pdf.PdfScreen
+import app.kholo.reader.table.GridScreen
+import app.kholo.reader.text.TextScreen
 import app.kholo.reader.ui.theme.LocalReaderBackground
 
 @Composable
@@ -51,6 +55,25 @@ fun ViewerRoute(
             onOpenElsewhere = onOpenElsewhere,
             onReport = { onReport("open") },
         )
+
+        is ViewerUiState.Other -> {
+            val actions = ReaderActions(
+                onBack = onBack,
+                onShare = onShare,
+                onOpenElsewhere = onOpenElsewhere,
+                onReport = { onReport("open") },
+                failed = { error ->
+                    OpenFailedScreen(error, current.name, onBack, onOpenElsewhere) { onReport("open") }
+                },
+            )
+            when (current.type) {
+                DocumentType.Csv, DocumentType.Xlsx ->
+                    GridScreen(current.uri, current.type, current.name, current.size, container, actions)
+                DocumentType.Docx, DocumentType.Pptx ->
+                    DocxScreen(current.uri, current.type, current.name, current.size, container, actions)
+                else -> TextScreen(current.uri, current.name, container, actions)
+            }
+        }
 
         is ViewerUiState.Ready -> PdfScreen(
             doc = current.doc,

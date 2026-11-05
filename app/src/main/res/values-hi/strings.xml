@@ -28,7 +28,7 @@
     <string name="tab_recent">हाल की</string>
     <string name="tab_favorites">पसंदीदा</string>
     <string name="home_empty_title">अभी कोई फ़ाइल नहीं</string>
-    <string name="home_empty_hint">कोई PDF खोलो, वो जल्दी खोलने के लिए यहाँ दिखेगी</string>
+    <string name="home_empty_hint">कोई फ़ाइल खोलो, वो जल्दी खोलने के लिए यहाँ दिखेगी</string>
     <string name="favorites_empty">अभी कोई पसंदीदा नहीं</string>
     <string name="favorites_empty_hint">फ़ाइल का स्टार दबाओ, वो यहाँ आ जाएगी</string>
     <string name="time_just_now">अभी</string>
@@ -63,5 +63,15 @@
     <string name="error_too_large">यह फ़ाइल खोलने के लिए बहुत बड़ी है</string>
     <string name="error_wrong_password">यह पासवर्ड सही नहीं है</string>
     <string name="error_password_unsupported">इस Android वर्शन पर पासवर्ड वाली PDF नहीं खुल सकती</string>
+    <string name="error_office_password">पासवर्ड वाली Word और Excel फ़ाइलें अभी सपोर्ट नहीं हैं</string>
+    <string name="table_rows">%1$,d पंक्तियाँ</string>
+    <string name="table_loading">लोड हो रहा है… %1$,d पंक्तियाँ</string>
+    <string name="table_empty">इस शीट में कोई टेबल नहीं है</string>
+    <string name="table_partial">इस फ़ाइल का कुछ हिस्सा नहीं पढ़ा जा सका</string>
+    <string name="text_truncated">इस फ़ाइल के शुरू के 16 MB ही दिखाए गए हैं</string>
+    <string name="note_reading_view">रीडिंग व्यू: Word का पेज लेआउट अलग दिख सकता है</string>
+    <string name="note_slides">स्लाइड का टेक्स्ट और तस्वीरें। एनिमेशन नहीं दिखते</string>
+    <string name="note_skipped">कुछ कंटेंट यहाँ नहीं दिखाया जा सका</string>
+    <string name="slide_number">स्लाइड %1$d</string>
     <string name="error_no_app">इसके लिए कोई ऐप नहीं मिली</string>
 </resources>

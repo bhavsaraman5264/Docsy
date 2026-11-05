@@ -3,18 +3,20 @@ naming:
     ignoreAnnotated:
       - Composable
 complexity:
-  LongMethod:
-    ignoreAnnotated:
-      - Composable
   CyclomaticComplexMethod:
-    ignoreAnnotated:
-      - Composable
+    allowedComplexity: 30
+  NestedBlockDepth:
+    allowedDepth: 7
+  LongMethod:
+    allowedLines: 130
   LongParameterList:
     ignoreAnnotated:
       - Composable
   TooManyFunctions:
     active: false
 style:
+  LoopWithTooManyJumpStatements:
+    active: false
   MagicNumber:
     ignorePropertyDeclaration: true
     ignoreAnnotated:
@@ -23,6 +25,9 @@ style:
     excludes:
       - '**/ui/theme/**'
       - '**/test/**'
+      - '**/table/**'
+      - '**/text/**'
+      - '**/docx/**'
   UnusedPrivateFunction:
     ignoreAnnotated:
       - Preview

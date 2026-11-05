@@ -34,7 +34,17 @@ private const val ROUTE_HOME = "home"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_REPORT = "report"
 private const val EXTRA_REPORT_CATEGORY = "report_category"
-private val OPEN_TYPES = arrayOf("application/pdf")
+private val OPEN_TYPES = arrayOf(
+    "application/pdf",
+    "text/plain",
+    "text/csv",
+    "text/comma-separated-values",
+    "application/csv",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel.sheet.macroEnabled.12",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+)
 
 class MainActivity : ComponentActivity() {
     private var sandbox: PdfSandboxHandle? = null
@@ -121,7 +131,7 @@ class MainActivity : ComponentActivity() {
 
     private fun share(uri: Uri) {
         val send = Intent(Intent.ACTION_SEND)
-            .setType("application/pdf")
+            .setType(contentResolver.getType(uri) ?: "*/*")
             .putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         launch(Intent.createChooser(send, null))

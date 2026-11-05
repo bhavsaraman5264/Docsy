@@ -29,7 +29,7 @@
     <string name="tab_recent">Recent</string>
     <string name="tab_favorites">Favorites</string>
     <string name="home_empty_title">No files yet</string>
-    <string name="home_empty_hint">Open a PDF and it will show up here for quick access</string>
+    <string name="home_empty_hint">Open a file and it will show up here for quick access</string>
     <string name="favorites_empty">No favorites yet</string>
     <string name="favorites_empty_hint">Tap the star on a file to keep it here</string>
     <string name="time_just_now">Just now</string>
@@ -66,5 +66,15 @@
     <string name="error_too_large">This file is too large to open</string>
     <string name="error_wrong_password">That password didn\'t work</string>
     <string name="error_password_unsupported">Password PDFs can\'t open on this Android version</string>
+    <string name="error_office_password">Password-protected Word and Excel files aren\'t supported yet</string>
+    <string name="table_rows">%1$,d rows</string>
+    <string name="table_loading">Loading… %1$,d rows</string>
+    <string name="table_empty">This sheet has no table</string>
+    <string name="table_partial">Part of this file couldn\'t be read</string>
+    <string name="text_truncated">Only the first 16 MB of this file is shown</string>
+    <string name="note_reading_view">Reading view: the Word page layout may look different</string>
+    <string name="note_slides">Slides as text and images. Animations aren\'t shown</string>
+    <string name="note_skipped">Some content couldn\'t be shown here</string>
+    <string name="slide_number">Slide %1$d</string>
     <string name="error_no_app">No app found for this</string>
 </resources>

@@ -17,6 +17,11 @@ sealed interface AppError {
         override val messageRes = R.string.error_password_unsupported
     }
 
+    /** Password wali Word ya Excel. Yeh ZIP nahi, OLE2 file hoti hai. */
+    data object OfficePassword : AppError {
+        override val messageRes = R.string.error_office_password
+    }
+
     data object FileGone : AppError {
         override val messageRes = R.string.error_file_gone
     }

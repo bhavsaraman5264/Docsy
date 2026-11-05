@@ -212,3 +212,48 @@ write('sample.xlsx', zip({
   'xl/_rels/workbook.xml.rels': `${X}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
   'xl/worksheets/sheet1.xml': `${X}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c><c r="B1" t="inlineStr"><is><t>Amount</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Asha</t></is></c><c r="B2"><v>100</v></c></row></sheetData></worksheet>`,
 }));
+
+// ---------- Rich Office fixtures ----------
+const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const PKG = 'http://schemas.openxmlformats.org/package/2006/relationships';
+const para = (t, style = '', extra = '') => `<w:p><w:pPr>${style ? `<w:pStyle w:val="${style}"/>` : ''}${extra}</w:pPr><w:r><w:t xml:space="preserve">${t}</w:t></w:r></w:p>`;
+const li = (t, num) => para(t, '', `<w:numPr><w:ilvl w:val="0"/><w:numId w:val="${num}"/></w:numPr>`);
+const cell = (t) => `<w:tc><w:p><w:r><w:t>${t}</w:t></w:r></w:p></w:tc>`;
+write('rich.docx', zip({
+  '[Content_Types].xml': `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
+  '_rels/.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/></Relationships>`,
+  'word/numbering.xml': `${X}<w:numbering ${W}><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>`,
+  'word/document.xml': `${X}<w:document ${W}><w:body>${para('Project report', 'Title')}${para('Summary', 'Heading1')}<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Bold text</w:t></w:r><w:r><w:t xml:space="preserve"> then normal, </w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>italic</w:t></w:r><w:r><w:t xml:space="preserve"> and हिंदी text.</w:t></w:r></w:p>${para('Points', 'Heading2')}${li('First bullet', 1)}${li('Second bullet', 1)}${li('Step one', 2)}${li('Step two', 2)}<w:tbl><w:tr>${cell('Name')}${cell('City')}${cell('Marks')}</w:tr><w:tr>${cell('Asha')}${cell('Indore')}${cell('91')}</w:tr></w:tbl>${para('After the table.')}</w:body></w:document>`,
+}));
+const S = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+const wbFiles = (sheets, extra = {}) => ({
+  '[Content_Types].xml': `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`,
+  '_rels/.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+  'xl/workbook.xml': `${X}<workbook ${S} xmlns:r="${REL}"><sheets>${sheets.map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`,
+  'xl/_rels/workbook.xml.rels': `${X}<Relationships xmlns="${PKG}">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>`,
+  ...extra,
+});
+write('rich.xlsx', zip(wbFiles(['Fees', 'Notes'], {
+  'xl/sharedStrings.xml': `${X}<sst ${S}><si><t>Name</t></si><si><t>Date</t></si><si><t>Aadhaar</t></si><si><r><t>Asha </t></r><r><t>Verma</t></r></si><si><t>हिंदी नोट</t></si></sst>`,
+  'xl/styles.xml': `${X}<styleSheet ${S}><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>`,
+  'xl/worksheets/sheet1.xml': `${X}<worksheet ${S}><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row><row r="2"><c r="A2" t="s"><v>3</v></c><c r="B2" s="1"><v>45292</v></c><c r="C2"><v>1.23456789012E11</v></c></row><row r="9"><c r="C9" t="b"><v>1</v></c></row></sheetData></worksheet>`,
+  'xl/worksheets/sheet2.xml': `${X}<worksheet ${S}><sheetData><row r="1"><c r="A1" t="s"><v>4</v></c></row></sheetData></worksheet>`,
+})));
+let big = '';
+for (let i = 1; i <= 100000; i++) big += `<row r="${i}"><c r="A${i}" t="inlineStr"><is><t>Person ${i}</t></is></c><c r="B${i}"><v>${i * 3}</v></c><c r="C${i}" t="inlineStr"><is><t>City ${i % 97}</t></is></c></row>`;
+write('big-100k-rows.xlsx', zip(wbFiles(['Big'], { 'xl/worksheets/sheet1.xml': `${X}<worksheet ${S}><sheetData>${big}</sheetData></worksheet>` })));
+const P = 'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"';
+const slide = (title, body) => `${X}<p:sld ${P}><p:cSld><p:spTree><p:sp><p:nvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>${title}</a:t></a:r></a:p></p:txBody></p:sp><p:sp><p:txBody>${body.map((b) => `<a:p><a:r><a:t>${b}</a:t></a:r></a:p>`).join('')}</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`;
+write('sample.pptx', zip({
+  '[Content_Types].xml': `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`,
+  '_rels/.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="ppt/presentation.xml"/></Relationships>`,
+  'ppt/presentation.xml': `${X}<p:presentation ${P} xmlns:r="${REL}"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/></p:sldIdLst></p:presentation>`,
+  'ppt/_rels/presentation.xml.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/slide" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="${REL}/slide" Target="slides/slide2.xml"/></Relationships>`,
+  'ppt/slides/slide1.xml': slide('Welcome', ['First point', 'Second point']),
+  'ppt/slides/slide2.xml': slide('Plan', ['Build', 'Test', 'Launch']),
+}));
+write('xxe.docx', zip({ 'word/document.xml': `<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY x SYSTEM "file:///etc/passwd">]><w:document ${W}><w:body><w:p><w:r><w:t>&x;</w:t></w:r></w:p></w:body></w:document>` }));
+write('broken.xlsx', Buffer.concat([Buffer.from('PK\x03\x04', 'latin1'), Buffer.alloc(200, 7)]));
+write('old.doc', Buffer.concat([Buffer.from('D0CF11E0A1B11AE1', 'hex'), Buffer.alloc(500)]));
+write('secret.xlsx', Buffer.concat([Buffer.from('D0CF11E0A1B11AE1', 'hex'), Buffer.alloc(500)]));

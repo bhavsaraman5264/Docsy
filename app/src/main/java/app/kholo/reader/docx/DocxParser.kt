@@ -1,11 +1,14 @@
 package app.kholo.reader.docx
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 import app.kholo.reader.core.file.SafeZip
 import app.kholo.reader.core.file.attr
 import app.kholo.reader.core.file.readRelationships
@@ -15,42 +18,93 @@ import java.io.IOException
 import org.xmlpull.v1.XmlPullParser
 
 private const val BULLET = "•"
+private const val TWIPS_PER_POINT = 20f
+private const val HALF_POINTS = 2f
+private const val EMU_PER_POINT = 12_700f
+private const val DEFAULT_SIZE_PT = 11f
+private const val HEX_RADIX = 16
+private const val OPAQUE = 0xFF000000L
 
-/** `word/document.xml` ko streaming me padh kar blocks banata hai. Word ka page layout nahi, reading view. */
+private data class TextProps(
+    val size: Float? = null,
+    val bold: Boolean? = null,
+    val italic: Boolean? = null,
+    val color: String? = null,
+)
+
+private class Run(var props: TextProps = TextProps(), var underline: Boolean = false)
+
+/** `word/document.xml` ko streaming me padh kar blocks banata hai. */
 class DocxParser(private val zip: SafeZip) {
     private val rels = readRelationships(zip.open("word/_rels/document.xml.rels"), "word")
-    private val styleNames = readStyleNames()
-    private val numbering = readNumbering()
+    private val styleNames = mutableMapOf<String, String>()
+    private val styleProps = mutableMapOf<String, TextProps>()
+    private var defaultSize = DEFAULT_SIZE_PT
+    private val numbering: Map<String, List<Boolean>>
     private val counters = mutableMapOf<String, Int>()
+    private var page = PageSetup()
 
-    fun parse(): List<DocBlock> {
+    init {
+        readStyles()
+        numbering = readNumbering()
+    }
+
+    @Suppress("CyclomaticComplexMethod") // XML tag ka switch, todne se padhna mushkil hoga.
+    fun parse(): ParsedDocument {
         val stream = zip.open("word/document.xml") ?: throw IOException("no document")
         val blocks = mutableListOf<DocBlock>()
         stream.use { input ->
             val parser = safeXml(input)
-            var tableDepth = 0
-            var rows = mutableListOf<List<String>>()
-            var row = mutableListOf<String>()
-            val cell = StringBuilder()
+            var depth = 0
+            var rows = mutableListOf<List<DocCell>>()
+            var row = mutableListOf<DocCell>()
+            var grid = mutableListOf<Float>()
+            val cellText = StringBuilder()
+            var cellRich = AnnotatedString.Builder()
+            var cellFill: String? = null
             var skippedNote = false
             parser.walk { event ->
                 if (event == XmlPullParser.START_TAG) {
                     when (parser.name) {
                         "tbl" -> {
-                            if (tableDepth == 0) rows = mutableListOf()
-                            tableDepth++
+                            if (depth == 0) {
+                                rows = mutableListOf()
+                                grid = mutableListOf()
+                            }
+                            depth++
                         }
-                        "tr" -> if (tableDepth == 1) row = mutableListOf()
-                        "tc" -> if (tableDepth == 1) cell.clear()
+                        "gridCol" -> if (depth == 1) grid += twips(parser.attr("w"))
+                        "tr" -> if (depth == 1) row = mutableListOf()
+                        "tc" -> if (depth == 1) {
+                            cellText.clear()
+                            cellRich = AnnotatedString.Builder()
+                            cellFill = null
+                        }
+                        "shd" -> if (depth == 1) cellFill = parser.attr("fill")?.takeIf { it != "auto" }
                         "p" -> {
                             val paragraph = readParagraph(parser, blocks)
-                            if (tableDepth > 0) {
-                                if (cell.isNotEmpty()) cell.append('\n')
-                                cell.append(paragraph?.text?.text.orEmpty())
-                            } else if (paragraph != null) {
-                                blocks += paragraph
+                            when {
+                                depth == 0 -> if (paragraph != null) blocks += paragraph
+                                paragraph != null -> {
+                                    if (cellText.isNotEmpty()) {
+                                        cellText.append('\n')
+                                        cellRich.append('\n')
+                                    }
+                                    cellText.append(paragraph.text.text)
+                                    cellRich.append(paragraph.rich)
+                                }
                             }
                         }
+                        "pgSz" -> page = page.copy(
+                            width = twips(parser.attr("w")).ifZero(page.width),
+                            height = twips(parser.attr("h")).ifZero(page.height),
+                        )
+                        "pgMar" -> page = page.copy(
+                            marginLeft = twips(parser.attr("left")).ifZero(page.marginLeft),
+                            marginRight = twips(parser.attr("right")).ifZero(page.marginRight),
+                            marginTop = twips(parser.attr("top")).ifZero(page.marginTop),
+                            marginBottom = twips(parser.attr("bottom")).ifZero(page.marginBottom),
+                        )
                         "txbxContent", "chart", "oMath" -> if (!skippedNote) {
                             blocks += DocBlock.Skipped
                             skippedNote = true
@@ -58,55 +112,97 @@ class DocxParser(private val zip: SafeZip) {
                     }
                 } else if (event == XmlPullParser.END_TAG) {
                     when (parser.name) {
-                        "tc" -> if (tableDepth == 1) row += cell.toString()
-                        "tr" -> if (tableDepth == 1) rows += row
+                        "tc" -> if (depth == 1) {
+                            row += DocCell(cellText.toString(), cellRich.toAnnotatedString(), cellFill)
+                        }
+                        "tr" -> if (depth == 1) rows += row
                         "tbl" -> {
-                            tableDepth--
-                            if (tableDepth == 0 && rows.isNotEmpty()) blocks += DocBlock.Table(rows)
+                            depth--
+                            if (depth == 0 && rows.isNotEmpty()) blocks += DocBlock.Table(rows, grid)
                         }
                     }
                 }
             }
         }
-        return blocks
+        return ParsedDocument(blocks, page)
     }
 
-    private class Run(var bold: Boolean = false, var italic: Boolean = false, var underline: Boolean = false)
+    private fun Float.ifZero(other: Float) = if (this > 0f) this else other
 
-    /** `<w:p>` ke END tak padhta hai. Tasveerein [blocks] me seedhe jati hain. */
-    private fun readParagraph(parser: XmlPullParser, blocks: MutableList<DocBlock>): DocBlock.Paragraph? {
-        val builder = AnnotatedString.Builder()
-        var heading = 0
-        var marker: String? = null
-        var indent = 0
+    private fun twips(value: String?): Float = (value?.toFloatOrNull() ?: 0f) / TWIPS_PER_POINT
+
+    private class ParagraphState {
+        var styleId: String? = null
         var numId: String? = null
+        var level = 0
+        var align = TextAlign.Start
+        var before = 0f
+        var after = 0f
+        var left = 0f
+        var imageWidth = 0f
+        var pageBreakBefore = false
+    }
+
+    /** `<w:p>` ke END tak padhta hai. Tasveerein aur page break [blocks] me seedhe jate hain. */
+    @Suppress("CyclomaticComplexMethod")
+    private fun readParagraph(parser: XmlPullParser, blocks: MutableList<DocBlock>): DocBlock.Paragraph? {
+        val plain = AnnotatedString.Builder()
+        val rich = AnnotatedString.Builder()
+        val state = ParagraphState()
         var run = Run()
         var depth = 1
         var inRunProps = false
+        var inParagraphProps = false
         var inText = false
         while (depth > 0) {
             when (parser.next()) {
                 XmlPullParser.START_TAG -> {
                     depth++
                     when (parser.name) {
-                        "pStyle" -> heading = headingOf(parser.attr("val"))
-                        "numId" -> numId = parser.attr("val")
-                        "ilvl" -> indent = parser.attr("val")?.toIntOrNull() ?: 0
+                        "pPr" -> inParagraphProps = true
+                        "pStyle" -> state.styleId = parser.attr("val")
+                        "numId" -> state.numId = parser.attr("val")
+                        "ilvl" -> state.level = parser.attr("val")?.toIntOrNull() ?: 0
+                        "jc" -> state.align = alignOf(parser.attr("val"))
+                        "spacing" -> if (inParagraphProps) {
+                            state.before = twips(parser.attr("before"))
+                            state.after = twips(parser.attr("after"))
+                        }
+                        "ind" -> if (inParagraphProps) state.left = twips(parser.attr("left"))
                         "r" -> run = Run()
-                        "rPr" -> inRunProps = true
-                        "b" -> if (inRunProps) run.bold = parser.attr("val") !in setOf("0", "false")
-                        "i" -> if (inRunProps) run.italic = parser.attr("val") !in setOf("0", "false")
+                        "rPr" -> inRunProps = !inParagraphProps
+                        "b" -> if (inRunProps) run.props = run.props.copy(bold = isOn(parser))
+                        "i" -> if (inRunProps) run.props = run.props.copy(italic = isOn(parser))
                         "u" -> if (inRunProps) run.underline = parser.attr("val") != "none"
+                        "sz" -> if (inRunProps) run.props = run.props.copy(size = halfPoints(parser.attr("val")))
+                        "color" -> if (inRunProps) run.props = run.props.copy(color = parser.attr("val"))
                         "t" -> inText = true
-                        "tab" -> if (!inRunProps) builder.append('\t')
-                        "br" -> builder.append('\n')
-                        "blip" -> parser.attr("embed")?.let(rels::get)?.let { blocks += DocBlock.Image(it) }
+                        "tab" -> if (!inParagraphProps) {
+                            plain.append('\t')
+                            rich.append('\t')
+                        }
+                        "br" -> if (parser.attr("type") == "page") {
+                            blocks += DocBlock.PageBreak
+                        } else {
+                            plain.append('\n')
+                            rich.append('\n')
+                        }
+                        "lastRenderedPageBreak" -> state.pageBreakBefore = true
+                        "extent" -> state.imageWidth = (parser.attr("cx")?.toFloatOrNull() ?: 0f) / EMU_PER_POINT
+                        "blip" -> parser.attr("embed")?.let(rels::get)?.let {
+                            blocks +=
+                                DocBlock.Image(it, state.imageWidth)
+                        }
                     }
                 }
-                XmlPullParser.TEXT -> if (inText) builder.styled(parser.text, run)
+                XmlPullParser.TEXT -> if (inText) {
+                    plain.append(parser.text, run)
+                    rich.appendRich(parser.text, run, state.styleId)
+                }
                 XmlPullParser.END_TAG -> {
                     depth--
                     when (parser.name) {
+                        "pPr" -> inParagraphProps = false
                         "rPr" -> inRunProps = false
                         "t" -> inText = false
                     }
@@ -114,15 +210,54 @@ class DocxParser(private val zip: SafeZip) {
                 XmlPullParser.END_DOCUMENT -> depth = 0
             }
         }
-        numId?.takeIf { it != "0" }?.let { marker = markerFor(it, indent) }
-        val text = builder.toAnnotatedString()
-        return if (text.isEmpty()) null else DocBlock.Paragraph(text, heading, marker, indent)
+        if (state.pageBreakBefore) blocks += DocBlock.PageBreak
+        val text = plain.toAnnotatedString()
+        if (text.isEmpty()) return null
+        return DocBlock.Paragraph(
+            text = text,
+            heading = headingOf(state.styleId),
+            marker = state.numId?.takeIf { it != "0" }?.let { markerFor(it, state.level) },
+            indent = state.level,
+            rich = rich.toAnnotatedString(),
+            align = state.align,
+            spaceBefore = state.before,
+            spaceAfter = state.after,
+            leftIndent = state.left,
+        )
     }
 
-    private fun AnnotatedString.Builder.styled(text: String, run: Run) {
+    private fun isOn(parser: XmlPullParser): Boolean = parser.attr("val") !in setOf("0", "false")
+
+    private fun halfPoints(value: String?): Float? = value?.toFloatOrNull()?.div(HALF_POINTS)
+
+    private fun alignOf(value: String?): TextAlign = when (value) {
+        "center" -> TextAlign.Center
+        "right", "end" -> TextAlign.End
+        "both", "distribute" -> TextAlign.Justify
+        else -> TextAlign.Start
+    }
+
+    private fun AnnotatedString.Builder.append(text: String, run: Run) {
         val style = SpanStyle(
-            fontWeight = if (run.bold) FontWeight.Bold else null,
-            fontStyle = if (run.italic) FontStyle.Italic else null,
+            fontWeight = if (run.props.bold == true) FontWeight.Bold else null,
+            fontStyle = if (run.props.italic == true) FontStyle.Italic else null,
+            textDecoration = if (run.underline) TextDecoration.Underline else null,
+        )
+        withStyle(style) { append(text) }
+    }
+
+    /** Run ki apni formatting pehle, phir paragraph style, phir document ka default. */
+    private fun AnnotatedString.Builder.appendRich(text: String, run: Run, styleId: String?) {
+        val base = styleProps[styleId] ?: TextProps()
+        val size = run.props.size ?: base.size ?: defaultSize
+        val bold = run.props.bold ?: base.bold ?: false
+        val italic = run.props.italic ?: base.italic ?: false
+        val color = (run.props.color ?: base.color)?.let(::parseColor) ?: Color.Black
+        val style = SpanStyle(
+            color = color,
+            fontSize = size.sp,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+            fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
             textDecoration = if (run.underline) TextDecoration.Underline else null,
         )
         withStyle(style) { append(text) }
@@ -146,22 +281,36 @@ class DocxParser(private val zip: SafeZip) {
         return "$value."
     }
 
-    private fun readStyleNames(): Map<String, String> {
-        val stream = zip.open("word/styles.xml") ?: return emptyMap()
-        val names = mutableMapOf<String, String>()
+    private fun readStyles() {
+        val stream = zip.open("word/styles.xml") ?: return
         var current: String? = null
+        var inDefaults = false
         stream.use {
             val parser = safeXml(it)
             parser.walk { event ->
                 if (event == XmlPullParser.START_TAG) {
                     when (parser.name) {
+                        "rPrDefault" -> inDefaults = true
                         "style" -> current = parser.attr("styleId")
-                        "name" -> current?.let { id -> names[id] = parser.attr("val").orEmpty().lowercase() }
+                        "name" -> current?.let { id -> styleNames[id] = parser.attr("val").orEmpty().lowercase() }
+                        "sz" -> {
+                            val size = halfPoints(parser.attr("val"))
+                            if (inDefaults && size != null) defaultSize = size
+                            updateStyle(current) { props -> props.copy(size = size) }
+                        }
+                        "b" -> updateStyle(current) { props -> props.copy(bold = isOn(parser)) }
+                        "i" -> updateStyle(current) { props -> props.copy(italic = isOn(parser)) }
+                        "color" -> updateStyle(current) { props -> props.copy(color = parser.attr("val")) }
                     }
+                } else if (event == XmlPullParser.END_TAG && parser.name == "rPrDefault") {
+                    inDefaults = false
                 }
             }
         }
-        return names
+    }
+
+    private fun updateStyle(id: String?, change: (TextProps) -> TextProps) {
+        if (id != null) styleProps[id] = change(styleProps[id] ?: TextProps())
     }
 
     /** numId se har level ka "numbered hai ya bullet". */
@@ -192,4 +341,10 @@ class DocxParser(private val zip: SafeZip) {
     private companion object {
         const val HEADING_LEVELS = 6
     }
+}
+
+/** `FF0000` jaisa hex. `auto` ya kharab value par null. */
+internal fun parseColor(value: String): Color? {
+    val rgb = value.toLongOrNull(HEX_RADIX) ?: return null
+    return Color(OPAQUE or rgb)
 }

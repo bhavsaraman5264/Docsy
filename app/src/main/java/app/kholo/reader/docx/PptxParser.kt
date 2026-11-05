@@ -11,7 +11,7 @@ import org.xmlpull.v1.XmlPullParser
 
 /** Har slide ka text aur tasveerein, order me. Animation, video aur SmartArt nahi. */
 class PptxParser(private val zip: SafeZip) {
-    fun parse(): List<DocBlock> {
+    fun parse(): ParsedDocument {
         val rels = readRelationships(zip.open("ppt/_rels/presentation.xml.rels"), "ppt")
         val order = mutableListOf<String>()
         val stream = zip.open("ppt/presentation.xml") ?: throw IOException("no presentation")
@@ -28,7 +28,7 @@ class PptxParser(private val zip: SafeZip) {
             blocks += DocBlock.SlideHeader(index + 1)
             readSlide(path, blocks)
         }
-        return blocks
+        return ParsedDocument(blocks)
     }
 
     /** `sldId` me `id` (number) aur `r:id` dono hote hain. Yahan `r:` wala chahiye. */

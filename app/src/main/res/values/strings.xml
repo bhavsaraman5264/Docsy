@@ -76,5 +76,7 @@
     <string name="note_slides">Slides as text and images. Animations aren\'t shown</string>
     <string name="note_skipped">Some content couldn\'t be shown here</string>
     <string name="slide_number">Slide %1$d</string>
+    <string name="view_page">Page</string>
+    <string name="view_read">Read</string>
     <string name="error_no_app">No app found for this</string>
 </resources>

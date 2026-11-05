@@ -73,5 +73,7 @@
     <string name="note_slides">स्लाइड का टेक्स्ट और तस्वीरें। एनिमेशन नहीं दिखते</string>
     <string name="note_skipped">कुछ कंटेंट यहाँ नहीं दिखाया जा सका</string>
     <string name="slide_number">स्लाइड %1$d</string>
+    <string name="view_page">पेज</string>
+    <string name="view_read">पढ़ो</string>
     <string name="error_no_app">इसके लिए कोई ऐप नहीं मिली</string>
 </resources>

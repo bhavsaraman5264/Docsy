@@ -257,3 +257,14 @@ write('xxe.docx', zip({ 'word/document.xml': `<?xml version="1.0"?><!DOCTYPE foo
 write('broken.xlsx', Buffer.concat([Buffer.from('PK\x03\x04', 'latin1'), Buffer.alloc(200, 7)]));
 write('old.doc', Buffer.concat([Buffer.from('D0CF11E0A1B11AE1', 'hex'), Buffer.alloc(500)]));
 write('secret.xlsx', Buffer.concat([Buffer.from('D0CF11E0A1B11AE1', 'hex'), Buffer.alloc(500)]));
+
+// Kai pages wali Word file: page todna aur shaded table test karne ke liye.
+const shaded = (t) => `<w:tc><w:tcPr><w:shd w:val="clear" w:fill="D9E2F3"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>${t}</w:t></w:r></w:p></w:tc>`;
+const manyRows = Array.from({ length: 40 }, (_, i) => `<w:tr>${cell(`Item ${i + 1}`)}${cell(`Value ${i + 1}`)}</w:tr>`).join('');
+const manyParas = Array.from({ length: 40 }, (_, i) => para(`Paragraph ${i + 1}: Lorem style filler text that wraps across the page width to show real line lengths in the page view.`)).join('');
+write('long.docx', zip({
+  '[Content_Types].xml': `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`,
+  '_rels/.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/></Relationships>`,
+  'word/styles.xml': `${X}<w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:styleId="Heading1"><w:name w:val="heading 1"/><w:rPr><w:b/><w:color w:val="1F4E79"/><w:sz w:val="32"/></w:rPr></w:style></w:styles>`,
+  'word/document.xml': `${X}<w:document ${W}><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/><w:jc w:val="center"/></w:pPr><w:r><w:t>Centered blue heading</w:t></w:r></w:p>${manyParas}<w:tbl><w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="7000"/></w:tblGrid><w:tr>${shaded('Name')}${shaded('Detail')}</w:tr>${manyRows}</w:tbl><w:p><w:r><w:br w:type="page"/></w:r></w:p>${para('After forced page break')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`,
+}));

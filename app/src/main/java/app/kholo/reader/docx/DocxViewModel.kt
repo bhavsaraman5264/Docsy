@@ -30,8 +30,8 @@ class DocxViewModel(
     private val size: Long?,
     private val container: AppContainer,
 ) : ViewModel() {
-    private val _state = MutableStateFlow<LoadState<List<DocBlock>>>(LoadState.Loading)
-    val state: StateFlow<LoadState<List<DocBlock>>> = _state.asStateFlow()
+    private val _state = MutableStateFlow<LoadState<ParsedDocument>>(LoadState.Loading)
+    val state: StateFlow<LoadState<ParsedDocument>> = _state.asStateFlow()
     private var zip: SafeZip? = null
     private var tempFile: File? = null
 
@@ -49,7 +49,7 @@ class DocxViewModel(
         }
     }
 
-    private fun parse(): List<DocBlock> {
+    private fun parse(): ParsedDocument {
         val suffix = if (type == DocumentType.Pptx) ".pptx" else ".docx"
         val file = container.tempFiles.copy(uri, suffix, size).also { tempFile = it }
         val opened = SafeZip(file).also { zip = it }

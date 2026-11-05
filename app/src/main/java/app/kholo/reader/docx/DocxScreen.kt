@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +51,7 @@ import app.kholo.reader.open.DocumentType
 import app.kholo.reader.ui.theme.Spacing
 import app.kholo.reader.viewer.DocumentScaffold
 import app.kholo.reader.viewer.ReaderActions
+import kotlinx.coroutines.launch
 
 private val READING_WIDTH = 680.dp
 private val CELL_WIDTH = 160.dp
@@ -79,20 +81,38 @@ fun DocxScreen(
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     var fontSize by rememberSaveable { mutableIntStateOf(DEFAULT_FONT_SP) }
-    DocumentScaffold(name, actions, barActions = { FontSizeActions(fontSize) { fontSize = it } }) { modifier ->
+    val pageMode by container.settings.wordPageView.collectAsStateWithLifecycle(initialValue = true)
+    val scope = rememberCoroutineScope()
+    val showPage = type == DocumentType.Docx && pageMode
+    DocumentScaffold(
+        title = name,
+        actions = actions,
+        barActions = {
+            if (type == DocumentType.Docx) {
+                TextButton(onClick = { scope.launch { container.settings.setWordPageView(!pageMode) } }) {
+                    Text(stringResource(if (pageMode) R.string.view_read else R.string.view_page))
+                }
+            }
+            if (!showPage) FontSizeActions(fontSize) { fontSize = it }
+        },
+    ) { modifier ->
         when (val current = state) {
             LoadState.Loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
             is LoadState.Failed -> actions.failed(current.error)
-            is LoadState.Ready -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                LazyColumn(
-                    modifier = Modifier.widthIn(max = READING_WIDTH).fillMaxWidth(),
-                    contentPadding = PaddingValues(Spacing.screenPadding),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.m),
-                ) {
-                    item { ReadingViewNote(type) }
-                    items(current.value) { block -> Block(block, fontSize, viewModel) }
+            is LoadState.Ready -> if (showPage) {
+                DocxPageView(current.value, viewModel, modifier)
+            } else {
+                Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    LazyColumn(
+                        modifier = Modifier.widthIn(max = READING_WIDTH).fillMaxWidth(),
+                        contentPadding = PaddingValues(Spacing.screenPadding),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.m),
+                    ) {
+                        item { ReadingViewNote(type) }
+                        items(current.value.blocks) { block -> Block(block, fontSize, viewModel) }
+                    }
                 }
             }
         }
@@ -123,6 +143,7 @@ private fun Block(block: DocBlock, fontSize: Int, viewModel: DocxViewModel) {
                 color = MaterialTheme.colorScheme.primary,
             )
         }
+        DocBlock.PageBreak -> Unit
         DocBlock.Skipped -> Text(
             stringResource(R.string.note_skipped),
             style = MaterialTheme.typography.bodySmall,
@@ -166,7 +187,7 @@ private fun TableBlock(block: DocBlock.Table, fontSize: Int) {
                     row.forEach { cell ->
                         SelectionContainer {
                             Text(
-                                text = cell,
+                                text = cell.text,
                                 modifier = Modifier.width(CELL_WIDTH).padding(Spacing.s),
                                 fontSize = (fontSize - 2).sp,
                                 fontWeight = if (index == 0) FontWeight.SemiBold else null,

@@ -1,5 +1,6 @@
 package app.kholo.reader.report
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import app.kholo.reader.R
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.ui.components.AppTopBar
@@ -64,9 +67,16 @@ fun ReportScreen(container: AppContainer, category: String, onBack: () -> Unit, 
                     container.crashRecorder.clear()
                     onSend(report)
                 },
+                modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.action_send)) }
             Text(stringResource(R.string.report_preview), style = MaterialTheme.typography.titleSmall)
-            Text(report, style = MaterialTheme.typography.bodySmall)
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Text(report, modifier = Modifier.padding(Spacing.m), style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

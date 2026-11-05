@@ -16,7 +16,11 @@ fun <T> ChoiceChips(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FlowRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
         options.forEach { option ->
             FilterChip(
                 selected = option == selected,

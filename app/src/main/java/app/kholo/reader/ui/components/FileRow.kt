@@ -1,16 +1,16 @@
 package app.kholo.reader.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,6 +20,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.kholo.reader.ui.theme.Spacing
 
+private val BADGE_SIZE = 48.dp
+private val BORDER_WIDTH = 1.dp
+
+/** File ka card: poora card tap hota hai, aur [trailing] me uske apne actions aate hain. */
 @Composable
 fun FileRow(
     title: String,
@@ -29,38 +33,47 @@ fun FileRow(
     modifier: Modifier = Modifier,
     trailing: @Composable () -> Unit = {},
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = Spacing.minTouchTarget)
-            .clickable(onClick = onClick)
-            .padding(start = Spacing.screenPadding, top = Spacing.m, bottom = Spacing.m, end = Spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.m),
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(BORDER_WIDTH, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.padding(start = Spacing.m, top = Spacing.m, bottom = Spacing.m, end = Spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = typeLabel,
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Box(
+                modifier = Modifier
+                    .size(BADGE_SIZE)
+                    .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = typeLabel,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(
+                    text = title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = subtitle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            trailing()
         }
-        Column(Modifier.weight(1f)) {
-            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        trailing()
     }
 }

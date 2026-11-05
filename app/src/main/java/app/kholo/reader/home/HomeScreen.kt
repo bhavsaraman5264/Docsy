@@ -2,8 +2,12 @@ package app.kholo.reader.home
 
 import android.text.format.DateUtils
 import android.text.format.Formatter
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -53,6 +57,11 @@ import kotlinx.coroutines.launch
 /** Tabs turant neeche hain, isliye bar chhota. Touch target phir bhi 48dp rehta hai. */
 private val HOME_BAR_HEIGHT = 48.dp
 
+/** Aakhri file `Open file` button ke neeche na chhupe. */
+private val LIST_BOTTOM_PADDING = 96.dp
+
+private const val JUST_NOW_MS = 60_000L
+
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -67,6 +76,7 @@ fun HomeScreen(
     val window = rememberWindowInfo()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val hasFiles = state.files.isNotEmpty()
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
@@ -86,7 +96,7 @@ fun HomeScreen(
                     onMenu = { scope.launch { drawer.open() } },
                     height = HOME_BAR_HEIGHT,
                 ) {
-                    if (window.isShortHeight) {
+                    if (window.isShortHeight && hasFiles) {
                         IconButton(onClick = onPickFile) {
                             Icon(painterResource(R.drawable.ic_add), stringResource(R.string.action_open_file))
                         }
@@ -94,7 +104,9 @@ fun HomeScreen(
                 }
             },
             floatingActionButton = {
-                if (!window.isShortHeight) PrimaryAction(stringResource(R.string.action_open_file), onPickFile)
+                if (!window.isShortHeight && hasFiles) {
+                    PrimaryAction(stringResource(R.string.action_open_file), onPickFile)
+                }
             },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
@@ -110,19 +122,10 @@ fun HomeScreen(
                         text = { Text(stringResource(R.string.tab_favorites)) },
                     )
                 }
-                if (state.files.isEmpty()) {
-                    EmptyHome(state.tab, onPickFile)
+                if (hasFiles) {
+                    FileGrid(state.files, window.widthClass, onOpen, onShare, viewModel)
                 } else {
-                    val columns = when (window.widthClass) {
-                        WidthClass.Compact -> 1
-                        WidthClass.Medium -> 2
-                        WidthClass.Expanded -> 3
-                    }
-                    LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize()) {
-                        items(state.files, key = { it.uri }) { file ->
-                            RecentRow(file, onOpen, onShare, viewModel)
-                        }
-                    }
+                    EmptyHome(state.tab, onPickFile)
                 }
             }
         }
@@ -148,6 +151,37 @@ fun HomeScreen(
 }
 
 @Composable
+private fun FileGrid(
+    files: List<RecentFile>,
+    widthClass: WidthClass,
+    onOpen: (RecentFile) -> Unit,
+    onShare: (RecentFile) -> Unit,
+    viewModel: HomeViewModel,
+) {
+    val columns = when (widthClass) {
+        WidthClass.Compact -> 1
+        WidthClass.Medium -> 2
+        WidthClass.Expanded -> 3
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = Spacing.screenPadding,
+            end = Spacing.screenPadding,
+            top = Spacing.m,
+            bottom = LIST_BOTTOM_PADDING,
+        ),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+    ) {
+        items(files, key = { it.uri }) { file ->
+            RecentRow(file, onOpen, onShare, viewModel)
+        }
+    }
+}
+
+@Composable
 private fun HomeDrawer(
     tab: HomeTab,
     onTab: (HomeTab) -> Unit,
@@ -158,33 +192,47 @@ private fun HomeDrawer(
     ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surface) {
         Text(
             text = stringResource(R.string.app_name),
-            modifier = Modifier.padding(Spacing.xl),
+            modifier = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.l),
             style = MaterialTheme.typography.titleLarge,
         )
-        val item: @Composable (Int, Boolean, () -> Unit) -> Unit = { label, selected, action ->
-            NavigationDrawerItem(
-                label = { Text(stringResource(label)) },
-                selected = selected,
-                onClick = {
-                    close()
-                    action()
-                },
-                modifier = Modifier.padding(horizontal = Spacing.m),
-            )
+        val item: @Composable (Int, Int, Boolean, () -> Unit) -> Unit = { icon, label, selected, action ->
+            DrawerRow(icon, label, selected) {
+                close()
+                action()
+            }
         }
-        item(R.string.tab_recent, tab == HomeTab.Recent) { onTab(HomeTab.Recent) }
-        item(R.string.tab_favorites, tab == HomeTab.Favorites) { onTab(HomeTab.Favorites) }
-        HorizontalDivider(Modifier.padding(vertical = Spacing.s))
-        item(R.string.action_settings, false, onSettings)
-        item(R.string.action_report, false, onReport)
+        item(R.drawable.ic_history, R.string.tab_recent, tab == HomeTab.Recent) { onTab(HomeTab.Recent) }
+        item(R.drawable.ic_star, R.string.tab_favorites, tab == HomeTab.Favorites) { onTab(HomeTab.Favorites) }
+        HorizontalDivider(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s))
+        item(R.drawable.ic_settings, R.string.action_settings, false, onSettings)
+        item(R.drawable.ic_feedback, R.string.action_report, false, onReport)
     }
 }
 
 @Composable
+private fun DrawerRow(@DrawableRes icon: Int, @StringRes label: Int, selected: Boolean, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        icon = { Icon(painterResource(icon), contentDescription = null) },
+        label = { Text(stringResource(label)) },
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = Spacing.m),
+    )
+}
+
+@Composable
 private fun EmptyHome(tab: HomeTab, onPickFile: () -> Unit) {
-    val message = if (tab == HomeTab.Favorites) R.string.favorites_empty else R.string.home_empty_title
-    EmptyState(message = stringResource(message)) {
-        if (tab == HomeTab.Recent) {
+    if (tab == HomeTab.Favorites) {
+        EmptyState(
+            title = stringResource(R.string.favorites_empty),
+            subtitle = stringResource(R.string.favorites_empty_hint),
+            icon = R.drawable.ic_star,
+        )
+    } else {
+        EmptyState(
+            title = stringResource(R.string.home_empty_title),
+            subtitle = stringResource(R.string.home_empty_hint),
+        ) {
             Button(onClick = onPickFile) { Text(stringResource(R.string.action_open_file)) }
         }
     }
@@ -197,30 +245,31 @@ private fun RecentRow(
     onShare: (RecentFile) -> Unit,
     viewModel: HomeViewModel,
 ) {
-    val context = LocalContext.current
-    val time = DateUtils.getRelativeTimeSpanString(file.openedAt)
-    val sizeText = Formatter.formatShortFileSize(context, file.size)
-    val subtitle = if (file.size > 0) "$sizeText - $time" else time.toString()
     FileRow(
         title = file.name,
-        subtitle = subtitle,
+        subtitle = fileSubtitle(file),
         typeLabel = file.typeLabel,
         onClick = { onOpen(file) },
     ) {
+        IconButton(onClick = { viewModel.toggleFavorite(file.uri) }) {
+            Icon(
+                painterResource(if (file.favorite) R.drawable.ic_star else R.drawable.ic_star_border),
+                contentDescription = stringResource(
+                    if (file.favorite) R.string.action_unfavorite else R.string.action_favorite,
+                ),
+                tint = if (file.favorite) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
         var open by remember { mutableStateOf(false) }
         Box {
             IconButton(onClick = { open = true }) {
                 Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.action_more))
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                val favorite = if (file.favorite) R.string.action_unfavorite else R.string.action_favorite
-                DropdownMenuItem(
-                    text = { Text(stringResource(favorite)) },
-                    onClick = {
-                        open = false
-                        viewModel.toggleFavorite(file.uri)
-                    },
-                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.action_share)) },
                     onClick = {
@@ -238,4 +287,16 @@ private fun RecentRow(
             }
         }
     }
+}
+
+@Composable
+private fun fileSubtitle(file: RecentFile): String {
+    val context = LocalContext.current
+    val age = System.currentTimeMillis() - file.openedAt
+    val time = if (age < JUST_NOW_MS) {
+        stringResource(R.string.time_just_now)
+    } else {
+        DateUtils.getRelativeTimeSpanString(file.openedAt).toString()
+    }
+    return if (file.size > 0) "${Formatter.formatShortFileSize(context, file.size)} · $time" else time
 }

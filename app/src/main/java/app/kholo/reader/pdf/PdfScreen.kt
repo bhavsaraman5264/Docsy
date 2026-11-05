@@ -142,7 +142,7 @@ fun PdfScreen(
                         onClose = viewModel::closeSearch,
                     )
                 } else {
-                    AppTopBar(title = doc.name, onBack = onBack) {
+                    AppTopBar(title = doc.name, onBack = onBack, titleStyle = MaterialTheme.typography.titleMedium) {
                         if (fullFeatures) {
                             IconButton(onClick = viewModel::openSearch) {
                                 Icon(

@@ -1,9 +1,14 @@
 package app.kholo.reader.ui.components
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,34 +18,61 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import app.kholo.reader.R
 import app.kholo.reader.ui.theme.KholoTheme
 import app.kholo.reader.ui.theme.Spacing
 
+private val ICON_CIRCLE = 80.dp
+private val ICON_SIZE = 36.dp
+
+/** Icon, bada sandesh, chhoti madad aur ek hi action. */
 @Composable
-fun EmptyState(message: String, modifier: Modifier = Modifier, action: @Composable () -> Unit = {}) {
+fun EmptyState(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    @DrawableRes icon: Int = R.drawable.ic_description,
+    action: @Composable () -> Unit = {},
+) {
     Column(
-        modifier = modifier.fillMaxSize().padding(Spacing.screenPadding),
-        verticalArrangement = Arrangement.spacedBy(Spacing.l, Alignment.CenterVertically),
+        modifier = modifier.fillMaxSize().padding(horizontal = Spacing.xxl),
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            painterResource(R.drawable.ic_description),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Box(
+            modifier = Modifier.size(ICON_CIRCLE).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(icon),
+                contentDescription = null,
+                modifier = Modifier.size(ICON_SIZE),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
         Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = title,
+            modifier = Modifier.padding(top = Spacing.xl),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
-        action()
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                modifier = Modifier.padding(top = Spacing.s),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Box(Modifier.padding(top = Spacing.xl)) { action() }
     }
 }
 
 @Preview(widthDp = 320)
 @Composable
 private fun EmptyStatePreview() {
-    KholoTheme { EmptyState(message = "Koi file kholo, wo yahan dikhegi") }
+    KholoTheme { EmptyState(title = "Koi file nahi", subtitle = "Koi file kholo, wo yahan dikhegi") }
 }

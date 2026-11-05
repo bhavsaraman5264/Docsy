@@ -2,30 +2,51 @@ package app.kholo.reader.pdf
 
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import app.kholo.reader.R
 import app.kholo.reader.ui.components.AppTopBar
 import app.kholo.reader.ui.theme.Spacing
+
+private val ICON_CIRCLE = 72.dp
+private val ICON_SIZE = 32.dp
+private val FORM_MAX_WIDTH = 480.dp
 
 /** Password sirf memory me rehta hai. Screenshot aur recent apps preview band hain. */
 @Composable
@@ -36,26 +57,69 @@ fun PasswordScreen(name: String, failedAttempt: Boolean, onSubmit: (String) -> U
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
     var password by remember { mutableStateOf("") }
-    Scaffold(topBar = { AppTopBar(title = name, onBack = onBack) }) { padding ->
+    var visible by remember { mutableStateOf(false) }
+    val submit = { if (password.isNotEmpty()) onSubmit(password) }
+    Scaffold(topBar = {
+        AppTopBar(title = name, onBack = onBack, titleStyle = MaterialTheme.typography.titleMedium)
+    }) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(Spacing.screenPadding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.xl, vertical = Spacing.xxl),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.l),
         ) {
-            Text(stringResource(R.string.password_title), style = MaterialTheme.typography.titleMedium)
+            Box(
+                modifier = Modifier.size(
+                    ICON_CIRCLE,
+                ).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_lock),
+                    contentDescription = null,
+                    modifier = Modifier.size(ICON_SIZE),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Text(
+                text = stringResource(R.string.password_title),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.password_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().widthIn(max = FORM_MAX_WIDTH),
                 label = { Text(stringResource(R.string.password_label)) },
                 singleLine = true,
                 isError = failedAttempt,
                 supportingText = {
                     if (failedAttempt) Text(stringResource(R.string.error_wrong_password))
                 },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    TextButton(onClick = { visible = !visible }) {
+                        Text(stringResource(if (visible) R.string.action_hide else R.string.action_show))
+                    }
+                },
+                visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
             )
-            Button(onClick = { onSubmit(password) }, enabled = password.isNotEmpty()) {
+            Button(
+                onClick = submit,
+                enabled = password.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().widthIn(max = FORM_MAX_WIDTH),
+            ) {
                 Text(stringResource(R.string.action_open))
             }
         }

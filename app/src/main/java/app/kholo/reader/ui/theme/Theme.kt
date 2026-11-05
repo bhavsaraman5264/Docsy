@@ -10,6 +10,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -18,6 +19,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kholo.reader.settings.SettingsRepository
 import app.kholo.reader.settings.ThemeMode
+import kotlinx.coroutines.flow.map
 
 private const val ANDROID_S = 31
 
@@ -43,9 +45,12 @@ fun KholoTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable 
  */
 @Composable
 fun AppTheme(settings: SettingsRepository, content: @Composable () -> Unit) {
-    val mode by settings.theme.collectAsStateWithLifecycle(initialValue = ThemeMode.Light)
+    // Saved theme aane se pehle null: yahan koi default dena restart ka chakkar bana deta hai,
+    // kyunki setApplicationNightMode badalte hi Activity dobara banti hai.
+    val savedMode = remember(settings) { settings.theme.map<ThemeMode, ThemeMode?> { it } }
+    val mode by savedMode.collectAsStateWithLifecycle(initialValue = null)
     val dark = when (mode) {
-        ThemeMode.System -> isSystemInDarkTheme()
+        null, ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
     }
@@ -53,8 +58,9 @@ fun AppTheme(settings: SettingsRepository, content: @Composable () -> Unit) {
     val window = LocalActivity.current?.window
     val view = LocalView.current
     LaunchedEffect(mode) {
-        if (Build.VERSION.SDK_INT >= ANDROID_S) {
-            context.getSystemService(UiModeManager::class.java).setApplicationNightMode(nightModeFor(mode))
+        val chosen = mode
+        if (chosen != null && Build.VERSION.SDK_INT >= ANDROID_S) {
+            context.getSystemService(UiModeManager::class.java).setApplicationNightMode(nightModeFor(chosen))
         }
     }
     SideEffect {

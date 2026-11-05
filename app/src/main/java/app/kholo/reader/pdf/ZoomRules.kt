@@ -4,6 +4,7 @@ private const val LIBRARY_MIN_ZOOM = 0.5f
 private const val LIBRARY_MAX_ZOOM = 25f
 private const val MAX_ZOOM_OVER_FIT = 8f
 private const val FIT_EPSILON = 0.01f
+private const val SNAP_TO_FIT_RANGE = 0.08f
 
 /** "PDF zoom ke niyam" ka pure logic. Isme Android UI code nahi hai. */
 object ZoomRules {
@@ -19,6 +20,10 @@ object ZoomRules {
     fun maxZoom(minZoom: Float): Float = (minZoom * MAX_ZOOM_OVER_FIT).coerceAtMost(LIBRARY_MAX_ZOOM)
 
     fun isAtFit(zoom: Float, fit: Float): Boolean = kotlin.math.abs(zoom - fit) <= FIT_EPSILON * fit
+
+    /** Pinch ke baad page fit ke itna paas ho to thoda tedha chhodne ke bajay seedha fit karo. */
+    fun shouldSnapToFit(zoom: Float, fit: Float): Boolean =
+        !isAtFit(zoom, fit) && kotlin.math.abs(zoom - fit) <= SNAP_TO_FIT_RANGE * fit
 
     /** Screen ke point ke neeche page ka kaunsa point hai (library ki coordinate formula). */
     fun contentAt(viewCoord: Float, scroll: Int, zoom: Float, inset: Int): Float = (viewCoord + scroll - inset) / zoom

@@ -63,4 +63,11 @@ class ZoomRulesTest {
         val scroll = ZoomRules.scrollFor(content, zoom = 4f, viewCoord = 500f, inset = 100)
         assertEquals(500f, content * 4f - scroll + 100f, 0.001f)
     }
+
+    @Test
+    fun `zoom close to fit snaps but a real zoom does not`() {
+        assertTrue(ZoomRules.shouldSnapToFit(zoom = 1.9f, fit = 1.815f))
+        assertFalse(ZoomRules.shouldSnapToFit(zoom = 1.815f, fit = 1.815f))
+        assertFalse(ZoomRules.shouldSnapToFit(zoom = 2.5f, fit = 1.815f))
+    }
 }

@@ -118,6 +118,7 @@ class ZoomController(
         trackedAnchor = centerPoint()
         val page = currentPage()
         onPage(page)
+        if (ZoomRules.shouldSnapToFit(view.zoom, fitFor(page))) fit()
         onFit(ZoomRules.isAtFit(view.zoom, fitFor(page)))
         AppLog.d(LogTag.ZOOM) { "settled zoom=${view.zoom} scroll=${view.scrollX},${view.scrollY}" }
     }

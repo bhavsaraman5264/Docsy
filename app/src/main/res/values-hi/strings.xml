@@ -4,6 +4,7 @@
     <string name="action_open">खोलो</string>
     <string name="action_settings">सेटिंग्स</string>
     <string name="action_back">वापस</string>
+    <string name="action_menu">मेन्यू</string>
     <string name="action_more">और विकल्प</string>
     <string name="action_search">खोजो</string>
     <string name="action_close">बंद करो</string>

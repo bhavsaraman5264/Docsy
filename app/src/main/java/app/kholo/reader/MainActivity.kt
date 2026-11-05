@@ -25,6 +25,7 @@ import app.kholo.reader.core.AppContainer
 import app.kholo.reader.home.HomeScreen
 import app.kholo.reader.home.HomeViewModel
 import app.kholo.reader.report.ReportScreen
+import app.kholo.reader.settings.LanguageStore
 import app.kholo.reader.settings.SettingsScreen
 import app.kholo.reader.ui.theme.AppTheme
 
@@ -51,6 +52,10 @@ private class OpenAt : ActivityResultContracts.OpenDocument() {
 class MainActivity : ComponentActivity() {
     private val container: AppContainer get() = (application as KholoApp).container
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LanguageStore.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -69,10 +74,6 @@ class MainActivity : ComponentActivity() {
                     ROUTE_SETTINGS -> SettingsScreen(
                         settings = container.settings,
                         onBack = { route = ROUTE_HOME },
-                        onReport = {
-                            category = "other"
-                            route = ROUTE_REPORT
-                        },
                     )
 
                     ROUTE_REPORT -> ReportScreen(
@@ -99,6 +100,10 @@ class MainActivity : ComponentActivity() {
                             onOpen = { open(Uri.parse(it.uri)) },
                             onShare = { share(Uri.parse(it.uri)) },
                             onSettings = { route = ROUTE_SETTINGS },
+                            onReport = {
+                                category = "other"
+                                route = ROUTE_REPORT
+                            },
                             onCrashReport = {
                                 category = "crash"
                                 route = ROUTE_REPORT

@@ -14,10 +14,20 @@ import app.kholo.reader.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
+fun AppTopBar(
+    title: String,
+    onBack: (() -> Unit)? = null,
+    onMenu: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
     TopAppBar(
         title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = {
+            if (onMenu != null) {
+                IconButton(onClick = onMenu) {
+                    Icon(painterResource(R.drawable.ic_menu), contentDescription = stringResource(R.string.action_menu))
+                }
+            }
             if (onBack != null) {
                 IconButton(onClick = onBack) {
                     Icon(

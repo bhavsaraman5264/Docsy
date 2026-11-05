@@ -13,20 +13,27 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +49,7 @@ import app.kholo.reader.ui.components.EmptyState
 import app.kholo.reader.ui.components.FileRow
 import app.kholo.reader.ui.components.PrimaryAction
 import app.kholo.reader.ui.theme.Spacing
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
@@ -51,52 +59,65 @@ fun HomeScreen(
     onOpen: (RecentFile) -> Unit,
     onShare: (RecentFile) -> Unit,
     onSettings: () -> Unit,
+    onReport: () -> Unit,
     onCrashReport: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val window = rememberWindowInfo()
-    Scaffold(
-        topBar = {
-            AppTopBar(title = stringResource(R.string.app_name)) {
-                if (window.isShortHeight) {
-                    IconButton(onClick = onPickFile) {
-                        Icon(painterResource(R.drawable.ic_add), stringResource(R.string.action_open_file))
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        drawerContent = {
+            HomeDrawer(
+                tab = state.tab,
+                onTab = viewModel::selectTab,
+                onSettings = onSettings,
+                onReport = onReport,
+                close = { scope.launch { drawer.close() } },
+            )
+        },
+    ) {
+        Scaffold(
+            topBar = {
+                AppTopBar(title = stringResource(R.string.app_name), onMenu = { scope.launch { drawer.open() } }) {
+                    if (window.isShortHeight) {
+                        IconButton(onClick = onPickFile) {
+                            Icon(painterResource(R.drawable.ic_add), stringResource(R.string.action_open_file))
+                        }
                     }
                 }
-                IconButton(onClick = onSettings) {
-                    Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.action_settings))
+            },
+            floatingActionButton = {
+                if (!window.isShortHeight) PrimaryAction(stringResource(R.string.action_open_file), onPickFile)
+            },
+        ) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
+                    Tab(
+                        selected = state.tab == HomeTab.Recent,
+                        onClick = { viewModel.selectTab(HomeTab.Recent) },
+                        text = { Text(stringResource(R.string.tab_recent)) },
+                    )
+                    Tab(
+                        selected = state.tab == HomeTab.Favorites,
+                        onClick = { viewModel.selectTab(HomeTab.Favorites) },
+                        text = { Text(stringResource(R.string.tab_favorites)) },
+                    )
                 }
-            }
-        },
-        floatingActionButton = {
-            if (!window.isShortHeight) PrimaryAction(stringResource(R.string.action_open_file), onPickFile)
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
-                Tab(
-                    selected = state.tab == HomeTab.Recent,
-                    onClick = { viewModel.selectTab(HomeTab.Recent) },
-                    text = { Text(stringResource(R.string.tab_recent)) },
-                )
-                Tab(
-                    selected = state.tab == HomeTab.Favorites,
-                    onClick = { viewModel.selectTab(HomeTab.Favorites) },
-                    text = { Text(stringResource(R.string.tab_favorites)) },
-                )
-            }
-            WhatsAppRow(onPickWhatsApp)
-            if (state.files.isEmpty()) {
-                EmptyHome(state.tab, onPickFile)
-            } else {
-                val columns = when (window.widthClass) {
-                    WidthClass.Compact -> 1
-                    WidthClass.Medium -> 2
-                    WidthClass.Expanded -> 3
-                }
-                LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize()) {
-                    items(state.files, key = { it.uri }) { file ->
-                        RecentRow(file, onOpen, onShare, viewModel)
+                WhatsAppRow(onPickWhatsApp)
+                if (state.files.isEmpty()) {
+                    EmptyHome(state.tab, onPickFile)
+                } else {
+                    val columns = when (window.widthClass) {
+                        WidthClass.Compact -> 1
+                        WidthClass.Medium -> 2
+                        WidthClass.Expanded -> 3
+                    }
+                    LazyVerticalGrid(columns = GridCells.Fixed(columns), modifier = Modifier.fillMaxSize()) {
+                        items(state.files, key = { it.uri }) { file ->
+                            RecentRow(file, onOpen, onShare, viewModel)
+                        }
                     }
                 }
             }
@@ -119,6 +140,39 @@ fun HomeScreen(
                 TextButton(onClick = viewModel::dismissCrash) { Text(stringResource(R.string.action_cancel)) }
             },
         )
+    }
+}
+
+@Composable
+private fun HomeDrawer(
+    tab: HomeTab,
+    onTab: (HomeTab) -> Unit,
+    onSettings: () -> Unit,
+    onReport: () -> Unit,
+    close: () -> Unit,
+) {
+    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surface) {
+        Text(
+            text = stringResource(R.string.app_name),
+            modifier = Modifier.padding(Spacing.xl),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        val item: @Composable (Int, Boolean, () -> Unit) -> Unit = { label, selected, action ->
+            NavigationDrawerItem(
+                label = { Text(stringResource(label)) },
+                selected = selected,
+                onClick = {
+                    close()
+                    action()
+                },
+                modifier = Modifier.padding(horizontal = Spacing.m),
+            )
+        }
+        item(R.string.tab_recent, tab == HomeTab.Recent) { onTab(HomeTab.Recent) }
+        item(R.string.tab_favorites, tab == HomeTab.Favorites) { onTab(HomeTab.Favorites) }
+        HorizontalDivider(Modifier.padding(vertical = Spacing.s))
+        item(R.string.action_settings, false, onSettings)
+        item(R.string.action_report, false, onReport)
     }
 }
 

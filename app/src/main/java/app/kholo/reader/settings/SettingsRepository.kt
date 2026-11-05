@@ -13,7 +13,7 @@ enum class ThemeMode { System, Light, Dark }
 
 class SettingsRepository(private val store: DataStore<Preferences>) {
     val theme: Flow<ThemeMode> = store.data.map { prefs ->
-        ThemeMode.entries.firstOrNull { it.name == prefs[THEME_KEY] } ?: ThemeMode.System
+        ThemeMode.entries.firstOrNull { it.name == prefs[THEME_KEY] } ?: ThemeMode.Light
     }
 
     suspend fun setTheme(mode: ThemeMode) {

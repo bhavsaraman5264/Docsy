@@ -2,6 +2,7 @@ package app.kholo.reader
 
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -12,12 +13,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.pdf.PdfSandboxHandle
 import androidx.pdf.SandboxedPdfLoader
 import app.kholo.reader.open.IntentParser
+import app.kholo.reader.settings.LanguageStore
 import app.kholo.reader.ui.theme.AppTheme
 import app.kholo.reader.viewer.ViewerRoute
 
 /** "Open with" aur Share ka seedha darwaza: koi splash ya Home beech me nahi. */
 class ViewerActivity : ComponentActivity() {
     private var sandbox: PdfSandboxHandle? = null
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LanguageStore.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

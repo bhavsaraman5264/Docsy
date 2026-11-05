@@ -2,11 +2,9 @@ package app.kholo.reader.home
 
 import android.text.format.DateUtils
 import android.text.format.Formatter
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -39,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kholo.reader.R
 import app.kholo.reader.recents.RecentFile
@@ -51,11 +50,13 @@ import app.kholo.reader.ui.components.PrimaryAction
 import app.kholo.reader.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
+/** Tabs turant neeche hain, isliye bar chhota. Touch target phir bhi 48dp rehta hai. */
+private val HOME_BAR_HEIGHT = 48.dp
+
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
     onPickFile: () -> Unit,
-    onPickWhatsApp: () -> Unit,
     onOpen: (RecentFile) -> Unit,
     onShare: (RecentFile) -> Unit,
     onSettings: () -> Unit,
@@ -80,7 +81,11 @@ fun HomeScreen(
     ) {
         Scaffold(
             topBar = {
-                AppTopBar(title = stringResource(R.string.app_name), onMenu = { scope.launch { drawer.open() } }) {
+                AppTopBar(
+                    title = stringResource(R.string.app_name),
+                    onMenu = { scope.launch { drawer.open() } },
+                    height = HOME_BAR_HEIGHT,
+                ) {
                     if (window.isShortHeight) {
                         IconButton(onClick = onPickFile) {
                             Icon(painterResource(R.drawable.ic_add), stringResource(R.string.action_open_file))
@@ -105,7 +110,6 @@ fun HomeScreen(
                         text = { Text(stringResource(R.string.tab_favorites)) },
                     )
                 }
-                WhatsAppRow(onPickWhatsApp)
                 if (state.files.isEmpty()) {
                     EmptyHome(state.tab, onPickFile)
                 } else {
@@ -174,19 +178,6 @@ private fun HomeDrawer(
         item(R.string.action_settings, false, onSettings)
         item(R.string.action_report, false, onReport)
     }
-}
-
-@Composable
-private fun WhatsAppRow(onClick: () -> Unit) {
-    Text(
-        text = stringResource(R.string.whatsapp_files),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = Spacing.screenPadding, vertical = Spacing.m),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-    )
 }
 
 @Composable

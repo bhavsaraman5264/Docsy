@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -15,12 +14,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.pdf.PdfSandboxHandle
+import androidx.pdf.SandboxedPdfLoader
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.home.HomeScreen
 import app.kholo.reader.home.HomeViewModel
@@ -34,22 +34,9 @@ private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_REPORT = "report"
 private const val EXTRA_REPORT_CATEGORY = "report_category"
 private val OPEN_TYPES = arrayOf("application/pdf")
-private val WHATSAPP_DOCUMENTS: Uri = Uri.parse(
-    "content://com.android.externalstorage.documents/document/" +
-        "primary%3AAndroid%2Fmedia%2Fcom.whatsapp%2FWhatsApp%2FMedia%2FWhatsApp%20Documents",
-)
-
-/** File picker jo chahe to WhatsApp Documents folder par khule. */
-private class OpenAt : ActivityResultContracts.OpenDocument() {
-    var initial: Uri? = null
-
-    override fun createIntent(context: Context, input: Array<String>): Intent =
-        super.createIntent(context, input).also { intent ->
-            initial?.let { intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, it) }
-        }
-}
 
 class MainActivity : ComponentActivity() {
+    private var sandbox: PdfSandboxHandle? = null
     private val container: AppContainer get() = (application as KholoApp).container
 
     override fun attachBaseContext(newBase: Context) {
@@ -59,14 +46,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // PDF engine alag process me chalta hai. Pehle se warm rahe to file tap karte hi khulti hai.
+        window.decorView.post { sandbox = SandboxedPdfLoader.startInitialization(this) }
         val startCategory = intent.getStringExtra(EXTRA_REPORT_CATEGORY)
         setContent {
             AppTheme(container.settings) {
                 val firstRoute = if (startCategory != null) ROUTE_REPORT else ROUTE_HOME
                 var route by rememberSaveable { mutableStateOf(firstRoute) }
                 var category by rememberSaveable { mutableStateOf(startCategory ?: "other") }
-                val contract = remember { OpenAt() }
-                val picker = rememberLauncherForActivityResult(contract) { uri -> uri?.let(::openPicked) }
+                val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                    uri?.let(::openPicked)
+                }
                 BackHandler(enabled = route != ROUTE_HOME) {
                     if (startCategory != null) finish() else route = ROUTE_HOME
                 }
@@ -89,14 +79,7 @@ class MainActivity : ComponentActivity() {
                         )
                         HomeScreen(
                             viewModel = homeViewModel,
-                            onPickFile = {
-                                contract.initial = null
-                                picker.launch(OPEN_TYPES)
-                            },
-                            onPickWhatsApp = {
-                                contract.initial = WHATSAPP_DOCUMENTS
-                                picker.launch(OPEN_TYPES)
-                            },
+                            onPickFile = { picker.launch(OPEN_TYPES) },
                             onOpen = { open(Uri.parse(it.uri)) },
                             onShare = { share(Uri.parse(it.uri)) },
                             onSettings = { route = ROUTE_SETTINGS },
@@ -113,6 +96,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        sandbox?.close()
+        super.onDestroy()
     }
 
     private fun openPicked(uri: Uri) {

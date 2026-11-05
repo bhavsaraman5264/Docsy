@@ -64,7 +64,7 @@ import app.kholo.reader.ui.theme.ReaderBackgroundDark
 import app.kholo.reader.ui.theme.Spacing
 import app.kholo.reader.viewer.OpenDocument
 
-private val TOP_BAR_HEIGHT = 64.dp
+private val TOP_BAR_HEIGHT = 56.dp
 private const val HIGHLIGHT_COLOR = 0x80FFEB3B.toInt()
 private const val CURRENT_HIGHLIGHT_COLOR = 0x80FF9800.toInt()
 

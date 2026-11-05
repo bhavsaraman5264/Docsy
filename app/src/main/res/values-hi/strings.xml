@@ -27,7 +27,6 @@
     <string name="tab_favorites">पसंदीदा</string>
     <string name="home_empty_title">कोई फ़ाइल खोलो, वो यहाँ दिखेगी</string>
     <string name="favorites_empty">फ़ाइल के मेन्यू से उसे पसंदीदा बनाओ</string>
-    <string name="whatsapp_files">WhatsApp Documents से खोलो</string>
     <string name="page_indicator">%1$d / %2$d</string>
     <string name="page_jump_title">पेज पर जाओ</string>
     <string name="page_jump_hint">पेज 1 से %1$d</string>

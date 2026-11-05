@@ -29,6 +29,7 @@ import app.kholo.reader.settings.LanguageStore
 import app.kholo.reader.settings.SettingsScreen
 import app.kholo.reader.ui.theme.AppTheme
 
+private const val PDF_WARMUP_DELAY_MS = 500L
 private const val ROUTE_HOME = "home"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_REPORT = "report"
@@ -46,8 +47,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // PDF engine alag process me chalta hai. Pehle se warm rahe to file tap karte hi khulti hai.
-        window.decorView.post { sandbox = SandboxedPdfLoader.startInitialization(this) }
+        // PDF engine alag process me chalta hai. Screen dikhne ke baad warm karo, taaki app ka start dhima na ho.
+        window.decorView.postDelayed(::warmPdfEngine, PDF_WARMUP_DELAY_MS)
         val startCategory = intent.getStringExtra(EXTRA_REPORT_CATEGORY)
         setContent {
             AppTheme(container.settings) {
@@ -96,6 +97,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun warmPdfEngine() {
+        if (!isDestroyed) sandbox = SandboxedPdfLoader.startInitialization(this)
     }
 
     override fun onDestroy() {

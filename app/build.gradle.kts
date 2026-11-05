@@ -84,4 +84,8 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation("org.json:json:20250517")
     testImplementation(libs.coroutines.test)
+
+    androidTestImplementation(libs.test.runner)
+    androidTestImplementation(libs.test.uiautomator)
+    androidTestImplementation(libs.test.ext.junit)
 }

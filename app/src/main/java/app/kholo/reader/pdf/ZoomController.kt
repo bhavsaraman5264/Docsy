@@ -34,6 +34,13 @@ class ZoomController(
 
     fun attach(scope: CoroutineScope) {
         view.addOnViewportChangedListener(this)
+        view.addOnGestureStateChangedListener(
+            object : PdfView.OnGestureStateChangedListener {
+                override fun onGestureStateChanged(newState: Int) {
+                    if (newState == PdfView.GESTURE_STATE_IDLE) settle()
+                }
+            },
+        )
         view.addOnLayoutChangeListener { _, _, _, right, _, _, _, oldRight, _ -> onLayout(right, oldRight) }
         view.addOnFirstContentLoadListener(
             object : PdfView.OnFirstContentLoadListener {
@@ -106,6 +113,15 @@ class ZoomController(
         view.scrollBy(left.x.roundToInt(), 0)
     }
 
+    private fun settle() {
+        if (!opened) return
+        trackedAnchor = centerPoint()
+        val page = currentPage()
+        onPage(page)
+        onFit(ZoomRules.isAtFit(view.zoom, fitFor(page)))
+        AppLog.d(LogTag.ZOOM) { "settled zoom=${view.zoom} scroll=${view.scrollX},${view.scrollY}" }
+    }
+
     private fun onLayout(right: Int, oldRight: Int) {
         if (!opened || right == oldRight || view.width == trackedWidth) return
         val page = trackedAnchor?.pageNum ?: view.firstVisiblePage
@@ -129,9 +145,11 @@ class ZoomController(
         zoomLevel: Float,
     ) {
         if (!opened || view.width != trackedWidth) return
-        val page = currentPage()
         trackedZoom = zoomLevel
-        trackedAnchor = centerPoint()
+        // Gesture ke dauraan har frame par sasta kaam hi karo. Poora hisaab gesture khatam hone par.
+        val idle = view.gestureState == PdfView.GESTURE_STATE_IDLE
+        if (idle) trackedAnchor = centerPoint()
+        val page = if (idle) currentPage() else firstVisiblePage
         onPage(page)
         onFit(ZoomRules.isAtFit(zoomLevel, fitFor(page)))
         val moved = abs(view.scrollY - lastScrollY) > HIDE_CONTROLS_SCROLL_PX

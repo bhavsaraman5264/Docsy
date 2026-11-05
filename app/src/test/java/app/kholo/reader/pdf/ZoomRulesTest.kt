@@ -56,4 +56,11 @@ class ZoomRulesTest {
         )
         assertEquals(ZoomRules.fitZoom(2272, 595) * 2f, zoom, 0.01f)
     }
+
+    @Test
+    fun `pinch keeps the point under the fingers in place`() {
+        val content = ZoomRules.contentAt(viewCoord = 500f, scroll = 200, zoom = 2f, inset = 100)
+        val scroll = ZoomRules.scrollFor(content, zoom = 4f, viewCoord = 500f, inset = 100)
+        assertEquals(500f, content * 4f - scroll + 100f, 0.001f)
+    }
 }

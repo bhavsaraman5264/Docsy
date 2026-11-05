@@ -23,17 +23,17 @@ private val INVERT_MATRIX = floatArrayOf(
 
 /**
  * `PdfView` ka parent. Rotate ka public API nahi hai, isliye poore View ko ghumate hain (M1 me test hua).
- * Hardware layer pehle se on rakhte hain, taaki night mode sirf paint badle aur page kaala na ho.
+ * Hardware layer sirf night mode me: normal reading me har frame par poori screen dobara na bane.
  */
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class PdfViewHost(context: Context, onTap: () -> Unit) : FrameLayout(context) {
     val pdfView = PdfView(context).apply { id = View.generateViewId() }
     private var rotationDegrees = 0
     private var topInset = 0
+    private val pinch = PinchZoom(context, pdfView)
 
     init {
         addView(pdfView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        pdfView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         val detector = GestureDetector(
             context,
             object : GestureDetector.SimpleOnGestureListener() {
@@ -51,7 +51,21 @@ class PdfViewHost(context: Context, onTap: () -> Unit) : FrameLayout(context) {
 
     fun setNight(night: Boolean) {
         val invert = ColorMatrixColorFilter(ColorMatrix(INVERT_MATRIX))
-        pdfView.setLayerPaint(if (night) Paint().apply { colorFilter = invert } else null)
+        // Layer parent par: PdfView par lagane se uske pages khaali reh jate the.
+        if (night) {
+            setLayerType(View.LAYER_TYPE_HARDWARE, Paint().apply { colorFilter = invert })
+        } else {
+            setLayerType(View.LAYER_TYPE_NONE, null)
+        }
+    }
+
+    /** Seedhe page par host aur PdfView ke coordinates ek jaise hain. Ghume page par library ka pinch chalta hai. */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val customPinch = rotationDegrees == 0
+        if (customPinch) pinch.onEvent(event)
+        val handled = super.dispatchTouchEvent(event)
+        if (customPinch) pinch.apply()
+        return handled
     }
 
     fun setPageRotation(degrees: Int) {

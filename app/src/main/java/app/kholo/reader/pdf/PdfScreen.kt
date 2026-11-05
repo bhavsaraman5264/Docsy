@@ -1,6 +1,7 @@
 package app.kholo.reader.pdf
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -9,11 +10,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -37,11 +41,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -52,7 +58,9 @@ import androidx.pdf.PdfRect
 import app.kholo.reader.R
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.ui.components.AppTopBar
+import app.kholo.reader.ui.theme.KholoTheme
 import app.kholo.reader.ui.theme.LocalReaderBackground
+import app.kholo.reader.ui.theme.ReaderBackgroundDark
 import app.kholo.reader.ui.theme.Spacing
 import app.kholo.reader.viewer.OpenDocument
 
@@ -98,59 +106,77 @@ fun PdfScreen(
         }
     }
     val density = LocalDensity.current
-    val statusBar = WindowInsets.statusBars.getTop(density)
-    LaunchedEffect(statusBar) { host.setTopInset(statusBar + with(density) { TOP_BAR_HEIGHT.roundToPx() }) }
+    LaunchedEffect(density) { host.setTopInset(with(density) { TOP_BAR_HEIGHT.roundToPx() }) }
     LaunchedEffect(state.night) { host.setNight(state.night) }
     LaunchedEffect(state.rotation) { host.setPageRotation(state.rotation) }
     SearchEffect(state.search, host)
     BackHandler(enabled = state.search != null) { viewModel.closeSearch() }
 
-    Box(Modifier.fillMaxSize().background(LocalReaderBackground.current)) {
-        AndroidView(factory = { host }, modifier = Modifier.fillMaxSize())
-        AnimatedVisibility(state.controlsVisible, enter = fadeIn(), exit = fadeOut()) {
-            val search = state.search
-            if (search != null) {
-                PdfSearchBar(
-                    state = search,
-                    onQuery = viewModel::search,
-                    onStep = viewModel::nextHit,
-                    onClose = viewModel::closeSearch,
-                )
-            } else {
-                AppTopBar(title = doc.name, onBack = onBack) {
-                    if (fullFeatures) {
-                        IconButton(onClick = viewModel::openSearch) {
-                            Icon(
-                                painterResource(R.drawable.ic_search),
-                                contentDescription = stringResource(R.string.action_search),
-                            )
-                        }
-                    }
-                    ReaderMenu(
-                        night = state.night,
-                        onRotate = viewModel::rotate,
-                        onNight = viewModel::toggleNight,
-                        onShare = onShare,
-                        onOpenElsewhere = onOpenElsewhere,
-                        onReport = onReport,
+    val background = if (state.night) ReaderBackgroundDark else LocalReaderBackground.current
+    val window = LocalActivity.current?.window
+    val rootView = LocalView.current
+    LaunchedEffect(background, window) {
+        // Night page ke upar status bar ke icons bhi halke hon.
+        if (window != null) {
+            val lightBars = background != ReaderBackgroundDark
+            WindowCompat.getInsetsController(window, rootView).isAppearanceLightStatusBars = lightBars
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(background)) {
+        // PDF status bar, navigation bar aur notch ke neeche kabhi nahi jayega.
+        AndroidView(
+            factory = { host },
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
+        )
+        ReaderControlsTheme(night = state.night) {
+            AnimatedVisibility(state.controlsVisible, enter = fadeIn(), exit = fadeOut()) {
+                val search = state.search
+                if (search != null) {
+                    PdfSearchBar(
+                        state = search,
+                        onQuery = viewModel::search,
+                        onStep = viewModel::nextHit,
+                        onClose = viewModel::closeSearch,
                     )
+                } else {
+                    AppTopBar(title = doc.name, onBack = onBack) {
+                        if (fullFeatures) {
+                            IconButton(onClick = viewModel::openSearch) {
+                                Icon(
+                                    painterResource(R.drawable.ic_search),
+                                    contentDescription = stringResource(R.string.action_search),
+                                )
+                            }
+                        }
+                        ReaderMenu(
+                            night = state.night,
+                            onRotate = viewModel::rotate,
+                            onNight = viewModel::toggleNight,
+                            onShare = onShare,
+                            onOpenElsewhere = onOpenElsewhere,
+                            onReport = onReport,
+                        )
+                    }
                 }
             }
-        }
-        AnimatedVisibility(
-            visible = state.controlsVisible || !state.atFit,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            BottomControls(
-                page = state.page,
-                pageCount = state.pageCount,
-                showPage = state.controlsVisible,
-                showFit = !state.atFit,
-                onPageClick = { viewModel.showPageJump(true) },
-                onFit = zoom::fit,
-            )
+            AnimatedVisibility(
+                visible = state.controlsVisible || !state.atFit,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                BottomControls(
+                    page = state.page,
+                    pageCount = state.pageCount,
+                    showPage = state.controlsVisible,
+                    showFit = !state.atFit,
+                    onPageClick = { viewModel.showPageJump(true) },
+                    onFit = zoom::fit,
+                )
+            }
         }
     }
     if (state.showPageJump) {
@@ -163,6 +189,12 @@ fun PdfScreen(
             onDismiss = { viewModel.showPageJump(false) },
         )
     }
+}
+
+/** Night me toolbar bhi dark, chahe app ki theme light ho. */
+@Composable
+private fun ReaderControlsTheme(night: Boolean, content: @Composable () -> Unit) {
+    if (night) KholoTheme(darkTheme = true, content = content) else content()
 }
 
 @Composable

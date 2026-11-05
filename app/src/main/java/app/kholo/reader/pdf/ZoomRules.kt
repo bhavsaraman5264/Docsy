@@ -20,6 +20,12 @@ object ZoomRules {
 
     fun isAtFit(zoom: Float, fit: Float): Boolean = kotlin.math.abs(zoom - fit) <= FIT_EPSILON * fit
 
+    /** Screen ke point ke neeche page ka kaunsa point hai (library ki coordinate formula). */
+    fun contentAt(viewCoord: Float, scroll: Int, zoom: Float, inset: Int): Float = (viewCoord + scroll - inset) / zoom
+
+    /** Woh scroll jisse page ka [content] point screen ke [viewCoord] par aa jaye. */
+    fun scrollFor(content: Float, zoom: Float, viewCoord: Float, inset: Int): Float = content * zoom - viewCoord + inset
+
     /**
      * Rotate ya window resize ke baad naya zoom. Jo user fit par tha wo fit par hi rahe,
      * aur jisne zoom kiya tha uska page par dikhne wala size badi screen ke hisaab se bana rahe.

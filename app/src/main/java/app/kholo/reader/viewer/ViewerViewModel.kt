@@ -13,6 +13,7 @@ import app.kholo.reader.core.log.LogTag
 import app.kholo.reader.open.DocumentType
 import app.kholo.reader.pdf.PdfCapabilities
 import app.kholo.reader.recents.RecentFile
+import app.kholo.reader.recents.fileIdentity
 import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,9 +71,7 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
 
     private suspend fun readyOther(type: DocumentType, file: FileInfo) {
         val name = file.name.orEmpty()
-        container.recents.record(
-            RecentFile(uri.toString(), name, file.size ?: 0L, type.label, System.currentTimeMillis()),
-        )
+        record(name, file.size ?: 0L, type)
         _state.value = ViewerUiState.Other(type, uri, name, file.size)
     }
 
@@ -96,18 +95,30 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
 
     private suspend fun ready(opened: PdfDocument, name: String) {
         document = opened
-        val key = uri.toString()
+        val key = fileIdentity(uri.toString(), name, info?.size ?: 0L)
         val reading = container.readingState.load(key)
         AppLog.i(LogTag.PDF) { "opened pages=${opened.pageCount}" }
-        container.recents.record(
-            RecentFile(key, name, info?.size ?: 0L, "PDF", System.currentTimeMillis()),
-        )
+        record(name, info?.size ?: 0L, DocumentType.Pdf)
         _state.value = ViewerUiState.Ready(OpenDocument(opened, name, key, reading))
+    }
+
+    private suspend fun record(name: String, size: Long, type: DocumentType) {
+        val keeps = withContext(container.dispatchers.io) { container.uriReader.hasKeptAccess(uri) }
+        container.recents.record(
+            RecentFile(
+                uri = uri.toString(),
+                name = name,
+                size = size,
+                typeLabel = type.label,
+                openedAt = System.currentTimeMillis(),
+                keepsAccess = keeps,
+            ),
+        )
     }
 
     private suspend fun fail(error: AppError, name: String?) {
         AppLog.w(LogTag.OPEN) { "open failed error=${error.javaClass.simpleName}" }
-        if (error == AppError.FileGone) container.recents.remove(uri.toString())
+        if (error == AppError.FileGone) container.recents.removeUnavailable(uri.toString())
         _state.value = ViewerUiState.Failed(error, name)
     }
 

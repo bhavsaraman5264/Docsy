@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kholo.reader.core.AppContainer
+import app.kholo.reader.recents.RecentFile
+import app.kholo.reader.recents.favoritesNewestFirst
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +22,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     private val pendingCrash = MutableStateFlow(false)
 
     val state: StateFlow<HomeUiState> = combine(container.recents.files, tab, pendingCrash) { files, tab, crash ->
-        val shown = if (tab == HomeTab.Favorites) files.filter { it.favorite } else files
+        val shown = if (tab == HomeTab.Favorites) files.favoritesNewestFirst() else files
         HomeUiState(tab, shown, crash)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HomeUiState())
 
@@ -37,11 +39,11 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { container.recents.toggleFavorite(uri) }
     }
 
-    fun remove(uri: String) {
+    fun remove(file: RecentFile) {
         viewModelScope.launch {
-            container.recents.remove(uri)
-            container.readingState.clear(uri)
-            withContext(container.dispatchers.io) { container.uriReader.releaseAccess(Uri.parse(uri)) }
+            container.recents.remove(file.uri)
+            container.readingState.clear(file.identity)
+            withContext(container.dispatchers.io) { container.uriReader.releaseAccess(Uri.parse(file.uri)) }
         }
     }
 

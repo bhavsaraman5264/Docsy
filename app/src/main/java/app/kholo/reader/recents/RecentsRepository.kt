@@ -16,7 +16,12 @@ class RecentsRepository(private val store: DataStore<Preferences>) {
 
     suspend fun remove(uri: String) = update { list -> list.filterNot { it.uri == uri } }
 
-    suspend fun toggleFavorite(uri: String) = update { it.toggleFavorite(uri) }
+    suspend fun toggleFavorite(uri: String) = update { it.toggleFavorite(uri, System.currentTimeMillis()) }
+
+    /** Jo file ab nahi khulti wo recent se hat jaye, par user ka favorite chupchaap na mite. */
+    suspend fun removeUnavailable(uri: String) = update { list ->
+        list.filterNot { it.uri == uri && !it.favorite }
+    }
 
     private suspend fun update(change: (List<RecentFile>) -> List<RecentFile>) {
         store.edit { it[RECENTS_KEY] = change(recentsFromJson(it[RECENTS_KEY])).toJson() }

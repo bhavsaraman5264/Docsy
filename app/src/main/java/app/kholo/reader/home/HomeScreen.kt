@@ -18,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -81,8 +80,6 @@ fun HomeScreen(
         drawerState = drawer,
         drawerContent = {
             HomeDrawer(
-                tab = state.tab,
-                onTab = viewModel::selectTab,
                 onSettings = onSettings,
                 onReport = onReport,
                 close = { scope.launch { drawer.close() } },
@@ -182,39 +179,30 @@ private fun FileGrid(
 }
 
 @Composable
-private fun HomeDrawer(
-    tab: HomeTab,
-    onTab: (HomeTab) -> Unit,
-    onSettings: () -> Unit,
-    onReport: () -> Unit,
-    close: () -> Unit,
-) {
+private fun HomeDrawer(onSettings: () -> Unit, onReport: () -> Unit, close: () -> Unit) {
     ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surface) {
         Text(
             text = stringResource(R.string.app_name),
             modifier = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.l),
             style = MaterialTheme.typography.titleLarge,
         )
-        val item: @Composable (Int, Int, Boolean, () -> Unit) -> Unit = { icon, label, selected, action ->
-            DrawerRow(icon, label, selected) {
+        val item: @Composable (Int, Int, () -> Unit) -> Unit = { icon, label, action ->
+            DrawerRow(icon, label) {
                 close()
                 action()
             }
         }
-        item(R.drawable.ic_history, R.string.tab_recent, tab == HomeTab.Recent) { onTab(HomeTab.Recent) }
-        item(R.drawable.ic_star, R.string.tab_favorites, tab == HomeTab.Favorites) { onTab(HomeTab.Favorites) }
-        HorizontalDivider(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.s))
-        item(R.drawable.ic_settings, R.string.action_settings, false, onSettings)
-        item(R.drawable.ic_feedback, R.string.action_report, false, onReport)
+        item(R.drawable.ic_settings, R.string.action_settings, onSettings)
+        item(R.drawable.ic_feedback, R.string.action_report, onReport)
     }
 }
 
 @Composable
-private fun DrawerRow(@DrawableRes icon: Int, @StringRes label: Int, selected: Boolean, onClick: () -> Unit) {
+private fun DrawerRow(@DrawableRes icon: Int, @StringRes label: Int, onClick: () -> Unit) {
     NavigationDrawerItem(
         icon = { Icon(painterResource(icon), contentDescription = null) },
         label = { Text(stringResource(label)) },
-        selected = selected,
+        selected = false,
         onClick = onClick,
         modifier = Modifier.padding(horizontal = Spacing.m),
     )
@@ -281,7 +269,7 @@ private fun RecentRow(
                     text = { Text(stringResource(R.string.action_remove_recent)) },
                     onClick = {
                         open = false
-                        viewModel.remove(file.uri)
+                        viewModel.remove(file)
                     },
                 )
             }

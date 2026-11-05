@@ -87,6 +87,8 @@ class UriReader(context: Context) {
         false
     }
 
+    fun hasKeptAccess(uri: Uri): Boolean = resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+
     fun releaseAccess(uri: Uri) {
         try {
             resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)

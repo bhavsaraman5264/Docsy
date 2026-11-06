@@ -1,6 +1,9 @@
 package app.kholo.reader.text
 
+import java.io.File
+import java.io.FileInputStream
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TextDecoderTest {
@@ -26,11 +29,30 @@ class TextDecoderTest {
         assertEquals("café", TextDecoder.decode("caf".toByteArray() + byteArrayOf(0xE9.toByte())))
     }
 
+    private fun pagerOver(text: String): Pair<TextPager, File> {
+        val file = File.createTempFile("pager", ".txt")
+        file.writeText(text)
+        return TextPager(FileInputStream(file), file.length(), Charsets.UTF_8, 0L) to file
+    }
+
     @Test
-    fun `chunks keep every line`() {
-        val text = (1..250).joinToString("\n")
-        val chunks = TextDecoder.chunks(text)
-        assertEquals(3, chunks.size)
-        assertEquals(text, chunks.joinToString("\n"))
+    fun `big text is cut on lines and loses nothing`() {
+        val text = (1..5000).joinToString("\n") { "लाइन $it of a long file" }
+        val (pager, file) = pagerOver(text)
+        assertTrue(pager.chunkCount > 5)
+        val joined = (0 until pager.chunkCount).joinToString("\n") { pager.chunk(it) }
+        assertEquals(text, joined)
+        pager.close()
+        file.delete()
+    }
+
+    @Test
+    fun `one giant line never splits a hindi letter`() {
+        val text = "हिंदी".repeat(20_000)
+        val (pager, file) = pagerOver(text)
+        val joined = (0 until pager.chunkCount).joinToString("") { pager.chunk(it) }
+        assertEquals(text, joined)
+        pager.close()
+        file.delete()
     }
 }

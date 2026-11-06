@@ -10,8 +10,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.pdf.PdfSandboxHandle
-import androidx.pdf.SandboxedPdfLoader
+import androidx.activity.result.contract.ActivityResultContracts
 import app.kholo.reader.open.IntentParser
 import app.kholo.reader.settings.LanguageStore
 import app.kholo.reader.ui.theme.AppTheme
@@ -19,7 +18,9 @@ import app.kholo.reader.viewer.ViewerRoute
 
 /** "Open with" aur Share ka seedha darwaza: koi splash ya Home beech me nahi. */
 class ViewerActivity : ComponentActivity() {
-    private var sandbox: PdfSandboxHandle? = null
+    private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(::reopen)
+    }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LanguageStore.wrap(newBase))
@@ -32,9 +33,9 @@ class ViewerActivity : ComponentActivity() {
             finish()
             return
         }
-        sandbox = SandboxedPdfLoader.startInitialization(this)
         enableEdgeToEdge()
         val container = (application as KholoApp).container
+        container.warmPdfEngine()
         setContent {
             AppTheme(container.settings) {
                 ViewerRoute(
@@ -43,10 +44,18 @@ class ViewerActivity : ComponentActivity() {
                     onBack = ::finish,
                     onShare = { share(request.uri) },
                     onOpenElsewhere = { openElsewhere(request.uri) },
+                    onPickAgain = { picker.launch(OPEN_TYPES) },
                     onReport = ::report,
                 )
             }
         }
+    }
+
+    /** Nayi chuni file ki permission hamesha ke liye rakhte hain, aur Recent ki wahi entry naya link le leti hai. */
+    private fun reopen(uri: Uri) {
+        (application as KholoApp).container.uriReader.keepAccess(uri)
+        startActivity(Intent(Intent.ACTION_VIEW, uri, this, ViewerActivity::class.java))
+        finish()
     }
 
     private fun share(uri: Uri) {
@@ -80,11 +89,6 @@ class ViewerActivity : ComponentActivity() {
         } catch (_: SecurityException) {
             Toast.makeText(this, R.string.error_no_app, Toast.LENGTH_SHORT).show()
         }
-    }
-
-    override fun onDestroy() {
-        sandbox?.close()
-        super.onDestroy()
     }
 
     private companion object {

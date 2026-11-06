@@ -35,8 +35,20 @@ object PasswordRules {
         val pan = details.pan.trim()
         val list = when (kind) {
             DocKind.Aadhaar -> aadhaar(details)
-            DocKind.IncomeTax -> if (pan.isNotEmpty() && dob.isNotEmpty()) listOf(pan.lowercase() + dob) else emptyList()
-            DocKind.Form16 -> if (pan.isNotEmpty() && dob.isNotEmpty()) listOf(pan.take(PAN_PREFIX).uppercase() + dob) else emptyList()
+            DocKind.IncomeTax -> if (pan.isNotEmpty() &&
+                dob.isNotEmpty()
+            ) {
+                listOf(pan.lowercase() + dob)
+            } else {
+                emptyList()
+            }
+            DocKind.Form16 -> if (pan.isNotEmpty() &&
+                dob.isNotEmpty()
+            ) {
+                listOf(pan.take(PAN_PREFIX).uppercase() + dob)
+            } else {
+                emptyList()
+            }
             DocKind.Form26As -> listOf(dob).filter { it.isNotEmpty() }
             DocKind.Bank -> bank(details, dob)
             DocKind.Other -> emptyList()

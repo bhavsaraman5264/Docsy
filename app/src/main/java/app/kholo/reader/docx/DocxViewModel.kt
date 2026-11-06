@@ -11,9 +11,16 @@ import app.kholo.reader.core.LoadState
 import app.kholo.reader.core.file.SafeZip
 import app.kholo.reader.core.file.readUpTo
 import app.kholo.reader.core.file.toAppError
+import app.kholo.reader.office.OfficeContent
+import app.kholo.reader.office.PptParser
+import app.kholo.reader.office.WordParser
 import app.kholo.reader.open.DocumentType
+import app.kholo.reader.viewer.FindController
+import app.kholo.reader.viewer.MAX_FIND_HITS
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,11 +36,14 @@ class DocxViewModel(
     private val type: DocumentType,
     private val size: Long?,
     private val container: AppContainer,
+    private val content: OfficeContent? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadState<ParsedDocument>>(LoadState.Loading)
     val state: StateFlow<LoadState<ParsedDocument>> = _state.asStateFlow()
     private var zip: SafeZip? = null
     private var tempFile: File? = null
+
+    val find = FindController<DocHit>(viewModelScope, container.dispatchers.io, ::scan)
 
     init {
         viewModelScope.launch {
@@ -53,11 +63,35 @@ class DocxViewModel(
         }
     }
 
-    private fun parse(): ParsedDocument {
+    private fun parse(): ParsedDocument = when (content) {
+        is OfficeContent.Word -> WordParser(content.document, content.table).parse()
+        is OfficeContent.Slides -> PptParser(content.document).parse()
+        else -> parseZip()
+    }
+
+    private fun parseZip(): ParsedDocument {
         val suffix = if (type == DocumentType.Pptx) ".pptx" else ".docx"
-        val file = container.tempFiles.copy(uri, suffix, size).also { tempFile = it }
+        // Password wali file pehle hi khul kar private cache me hai, aur use ViewerViewModel mitata hai.
+        val file = (content as? OfficeContent.Package)?.file
+            ?: container.tempFiles.copy(uri, suffix, size).also { tempFile = it }
         val opened = SafeZip(file).also { zip = it }
-        return if (type == DocumentType.Pptx) PptxParser(opened).parse() else DocxParser(opened).parse()
+        return if (type == DocumentType.Pptx) {
+            PptxParser(opened).parse()
+        } else {
+            DocxParser(opened).parse { partial -> _state.value = LoadState.Ready(partial) }
+        }
+    }
+
+    private suspend fun scan(query: String, emit: (List<DocHit>) -> Unit) {
+        val blocks = (_state.value as? LoadState.Ready)?.value?.blocks ?: return
+        var found = 0
+        for ((index, block) in blocks.withIndex()) {
+            if (found >= MAX_FIND_HITS) break
+            coroutineContext.ensureActive()
+            val hits = blockHits(index, block, query)
+            if (hits.isNotEmpty()) emit(hits)
+            found += hits.size
+        }
     }
 
     /** Tasveer dikhne par hi decode hoti hai, screen ke hisaab se chhoti karke. */

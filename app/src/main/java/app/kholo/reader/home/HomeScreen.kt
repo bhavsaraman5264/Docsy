@@ -4,14 +4,27 @@ import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
@@ -26,30 +39,46 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kholo.reader.R
 import app.kholo.reader.recents.RecentFile
-import app.kholo.reader.ui.adaptive.WidthClass
+import app.kholo.reader.tools.ToolKind
 import app.kholo.reader.ui.adaptive.rememberWindowInfo
 import app.kholo.reader.ui.components.AppTopBar
 import app.kholo.reader.ui.components.EmptyState
 import app.kholo.reader.ui.components.FileRow
 import app.kholo.reader.ui.components.PrimaryAction
 import app.kholo.reader.ui.theme.FavoriteStar
+import app.kholo.reader.ui.theme.LocalBarColors
 import app.kholo.reader.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
@@ -59,7 +88,17 @@ private val HOME_BAR_HEIGHT = 48.dp
 /** Aakhri file `Open file` button ke neeche na chhupe. */
 private val LIST_BOTTOM_PADDING = 96.dp
 
+/** Screen ke left ke itne hisse se shuru hua swipe menu kholta hai. Beech aur right ka swipe nahi. */
+private const val DRAWER_START_SHARE = 0.35f
+
+/** Itna khinchne par menu khule, taaki halki si ungli se na khul jaye. */
+private val DRAWER_PULL = 48.dp
+
+/** Page ka itna hissa khinchne par tab badle. Default aadha hai, jo bhaari lagta hai. */
+private const val TAB_SWITCH_THRESHOLD = 0.3f
+
 private const val JUST_NOW_MS = 60_000L
+private const val FILE_ROW = "file"
 
 @Composable
 fun HomeScreen(
@@ -69,15 +108,33 @@ fun HomeScreen(
     onShare: (RecentFile) -> Unit,
     onSettings: () -> Unit,
     onReport: () -> Unit,
+    onTool: (ToolKind) -> Unit,
     onCrashReport: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val window = rememberWindowInfo()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val hasFiles = state.files.isNotEmpty()
+    val pager = rememberPagerState(initialPage = viewModel.lastPage) { HomeTab.entries.size }
+    val recentList = rememberLazyListState()
+    val favoriteList = rememberLazyListState()
+    LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { viewModel.lastPage = it } }
+    val pullPx = with(LocalDensity.current) { DRAWER_PULL.toPx() }
+    val drawerPull = remember(drawer, pullPx) { DrawerPull(pullPx) { scope.launch { drawer.open() } } }
+    // Sirf button ke andar padha jata hai, taaki swipe ke beech poori screen dobara na bane.
+    val hasFiles by remember(state.recents, state.favorites) {
+        derivedStateOf {
+            when (HomeTab.entries[pager.currentPage]) {
+                HomeTab.Recent -> state.recents.isNotEmpty()
+                HomeTab.Favorites -> state.favorites.isNotEmpty()
+                HomeTab.Tools -> false
+            }
+        }
+    }
     ModalNavigationDrawer(
         drawerState = drawer,
+        // Side swipe tabs ke liye hai. Band drawer ko [DrawerPull] pehle tab se kholta hai.
+        gesturesEnabled = drawer.isOpen,
         drawerContent = {
             HomeDrawer(
                 onSettings = onSettings,
@@ -107,22 +164,35 @@ fun HomeScreen(
             },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
-                PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
-                    Tab(
-                        selected = state.tab == HomeTab.Recent,
-                        onClick = { viewModel.selectTab(HomeTab.Recent) },
-                        text = { Text(stringResource(R.string.tab_recent)) },
-                    )
-                    Tab(
-                        selected = state.tab == HomeTab.Favorites,
-                        onClick = { viewModel.selectTab(HomeTab.Favorites) },
-                        text = { Text(stringResource(R.string.tab_favorites)) },
-                    )
-                }
-                if (hasFiles) {
-                    FileGrid(state.files, window.widthClass, onOpen, onShare, viewModel)
-                } else {
-                    EmptyHome(state.tab, onPickFile)
+                HomeTabs(pager) { scope.launch { pager.animateScrollToPage(it.ordinal) } }
+                HorizontalPager(
+                    state = pager,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(drawerPull) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                drawerPull.fromEdge = down.position.x <= size.width * DRAWER_START_SHARE
+                            }
+                        }
+                        .nestedScroll(drawerPull),
+                    // Teeno tabs pehle se bane rehte hain, isliye swipe ke beech kuch naya nahi banta.
+                    beyondViewportPageCount = HomeTab.entries.size - 1,
+                    flingBehavior = PagerDefaults.flingBehavior(
+                        state = pager,
+                        snapAnimationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        snapPositionalThreshold = TAB_SWITCH_THRESHOLD,
+                    ),
+                ) { page ->
+                    when (val shown = HomeTab.entries[page]) {
+                        HomeTab.Tools -> ToolList(onTool)
+                        HomeTab.Recent -> FilePage(shown, state.recents, recentList, onPickFile) {
+                            RecentRow(it, onOpen, onShare, viewModel)
+                        }
+                        HomeTab.Favorites -> FilePage(shown, state.favorites, favoriteList, onPickFile) {
+                            RecentRow(it, onOpen, onShare, viewModel)
+                        }
+                    }
                 }
             }
         }
@@ -147,27 +217,77 @@ fun HomeScreen(
     }
 }
 
+/** Sirf screen par dikhne wali rows banti hain, isliye hazaron files par bhi scroll halka rehta hai. */
 @Composable
-private fun FileGrid(
+private fun FilePage(
+    tab: HomeTab,
     files: List<RecentFile>,
-    widthClass: WidthClass,
-    onOpen: (RecentFile) -> Unit,
-    onShare: (RecentFile) -> Unit,
-    viewModel: HomeViewModel,
+    listState: LazyListState,
+    onPickFile: () -> Unit,
+    row: @Composable (RecentFile) -> Unit,
 ) {
-    val columns = when (widthClass) {
-        WidthClass.Compact -> 1
-        WidthClass.Medium -> 2
-        WidthClass.Expanded -> 3
-    }
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING),
-    ) {
-        items(files, key = { it.uri }) { file ->
-            RecentRow(file, onOpen, onShare, viewModel)
+    if (files.isEmpty()) {
+        EmptyHome(tab, onPickFile)
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING),
+        ) {
+            items(files, key = { it.uri }, contentType = { FILE_ROW }) { row(it) }
         }
+    }
+}
+
+@Composable
+private fun ToolList(onTool: (ToolKind) -> Unit) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        items(ToolKind.entries) { tool ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onTool(tool) }
+                    .padding(horizontal = Spacing.screenPadding, vertical = Spacing.m),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.l),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painterResource(tool.icon),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(tool.title), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(tool.hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Pehle tab par pager aur peeche nahi ja sakta. Kinare se shuru hua bacha hua right swipe menu kholta hai. */
+private class DrawerPull(private val threshold: Float, private val open: () -> Unit) : NestedScrollConnection {
+    private var pulled = 0f
+    var fromEdge = false
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source == NestedScrollSource.UserInput && fromEdge) {
+            pulled = if (available.x > 0f) pulled + available.x else 0f
+            if (pulled >= threshold) {
+                pulled = 0f
+                open()
+            }
+        }
+        return Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        pulled = 0f
+        return Velocity.Zero
     }
 }
 
@@ -275,11 +395,50 @@ private fun RecentRow(
 @Composable
 private fun fileSubtitle(file: RecentFile): String {
     val context = LocalContext.current
-    val age = System.currentTimeMillis() - file.openedAt
-    val time = if (age < JUST_NOW_MS) {
-        stringResource(R.string.time_just_now)
-    } else {
-        DateUtils.getRelativeTimeSpanString(file.openedAt).toString()
+    val justNow = stringResource(R.string.time_just_now)
+    // Date format mehnga hai. Scroll ke har frame me dobara nahi banana.
+    return remember(file.openedAt, file.size, justNow) {
+        val age = System.currentTimeMillis() - file.openedAt
+        val time = if (age < JUST_NOW_MS) {
+            justNow
+        } else {
+            DateUtils.getRelativeTimeSpanString(file.openedAt).toString()
+        }
+        if (file.size > 0) "${Formatter.formatShortFileSize(context, file.size)} · $time" else time
     }
-    return if (file.size > 0) "${Formatter.formatShortFileSize(context, file.size)} · $time" else time
+}
+
+@Composable
+private fun HomeTabs(pager: PagerState, onSelect: (HomeTab) -> Unit) {
+    val bar = LocalBarColors.current
+    val selected = HomeTab.entries[pager.currentPage]
+    PrimaryTabRow(
+        selectedTabIndex = selected.ordinal,
+        containerColor = bar.container,
+        contentColor = bar.content,
+        indicator = {
+            TabRowDefaults.PrimaryIndicator(
+                modifier = Modifier.tabIndicatorOffset(selected.ordinal, matchContentSize = true),
+                width = Dp.Unspecified,
+                color = bar.content,
+            )
+        },
+        divider = {},
+    ) {
+        HomeTab.entries.forEach { tab ->
+            Tab(
+                selected = tab == selected,
+                onClick = { onSelect(tab) },
+                text = { Text(stringResource(tab.label()), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                selectedContentColor = bar.content,
+                unselectedContentColor = bar.quiet,
+            )
+        }
+    }
+}
+
+private fun HomeTab.label(): Int = when (this) {
+    HomeTab.Recent -> R.string.tab_recent
+    HomeTab.Favorites -> R.string.tab_favorites
+    HomeTab.Tools -> R.string.tab_tools
 }

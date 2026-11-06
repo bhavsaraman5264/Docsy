@@ -8,15 +8,23 @@ import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.AppError
 import app.kholo.reader.core.DocResult
 import app.kholo.reader.core.file.FileInfo
+import app.kholo.reader.core.file.toAppError
 import app.kholo.reader.core.log.AppLog
 import app.kholo.reader.core.log.LogTag
+import app.kholo.reader.office.OfficeContent
+import app.kholo.reader.office.OfficeDocument
+import app.kholo.reader.office.OfficeFile
+import app.kholo.reader.office.OfficeLock
+import app.kholo.reader.office.OleResult
 import app.kholo.reader.open.DocumentType
 import app.kholo.reader.pdf.PdfCapabilities
 import app.kholo.reader.recents.RecentFile
 import app.kholo.reader.recents.fileIdentity
+import app.kholo.reader.recents.isToolResult
 import app.kholo.reader.unlock.DocKind
 import app.kholo.reader.unlock.PasswordRules
 import app.kholo.reader.unlock.UnlockDetails
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,14 +32,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val MODERN_OFFICE = setOf("docx", "xlsx", "xlsm", "pptx")
-
 class ViewerViewModel(private val uri: Uri, private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow<ViewerUiState>(ViewerUiState.Loading)
     val state: StateFlow<ViewerUiState> = _state.asStateFlow()
 
     private var info: FileInfo? = null
     private var document: PdfDocument? = null
+    private var lock: OfficeLock? = null
+    private var decrypted: File? = null
 
     init {
         viewModelScope.launch { load() }
@@ -54,7 +62,7 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
             DocumentType.Text, DocumentType.Csv, DocumentType.Docx, DocumentType.Xlsx, DocumentType.Pptx ->
                 readyOther(type, file)
             DocumentType.Empty -> fail(AppError.Empty, file.name)
-            DocumentType.LegacyOffice -> fail(legacyError(file.name), file.name)
+            DocumentType.Doc, DocumentType.Xls, DocumentType.Ppt, DocumentType.LegacyOffice -> openOle(file)
             DocumentType.Unknown -> fail(AppError.Unsupported, file.name)
         }
     }
@@ -66,10 +74,86 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
         return withContext(container.dispatchers.io) { container.uriReader.zipType(uri) }
     }
 
-    /** `.xlsx` naam ki OLE2 file asal me password wali hoti hai, kharab nahi. */
-    private fun legacyError(name: String?): AppError {
-        val extension = name?.substringAfterLast('.', "")?.lowercase()
-        return if (extension in MODERN_OFFICE) AppError.OfficePassword else AppError.Unsupported
+    /** OLE2 ke andar dekhe bina pata nahi chalta: purani file hai, ya password wali nayi. */
+    private suspend fun openOle(file: FileInfo) {
+        val name = file.name.orEmpty()
+        val result = try {
+            withContext(container.dispatchers.io) {
+                OfficeFile(container.tempFiles::newFile).open(container.tempFiles.copy(uri, ".ole", file.size))
+            }
+        } catch (e: IOException) {
+            fail(e.toAppError(), name)
+            return
+        } catch (e: SecurityException) {
+            fail(e.toAppError(), name)
+            return
+        }
+        when (result) {
+            is OleResult.Ready -> readyOffice(result.document, name)
+            is OleResult.Locked -> {
+                lock = result.lock
+                _state.value = ViewerUiState.NeedsPassword(name, failedAttempt = false)
+            }
+            OleResult.PasswordUnsupported -> fail(AppError.OfficePassword, name)
+        }
+    }
+
+    private suspend fun readyOffice(opened: OfficeDocument, name: String) {
+        val size = info?.size
+        decrypted = (opened.content as? OfficeContent.Package)?.file
+        closeLock()
+        record(name, size ?: 0L, opened.type)
+        _state.value = ViewerUiState.Other(opened.type, uri, name, size, opened.content)
+    }
+
+    /** Agile file ka password jaanchne me lakh se zyada hash lagte hain, isliye main thread se door. */
+    private suspend fun tryOffice(office: OfficeLock, password: String): DocResult<OfficeDocument> = try {
+        val opened = withContext(container.dispatchers.default) { office.unlock(password) }
+        if (opened == null) DocResult.Failure(AppError.WrongPassword) else DocResult.Success(opened)
+    } catch (e: IOException) {
+        DocResult.Failure(e.toAppError())
+    } catch (_: IndexOutOfBoundsException) {
+        DocResult.Failure(AppError.Corrupt)
+    } catch (_: IllegalArgumentException) {
+        DocResult.Failure(AppError.Corrupt)
+    }
+
+    private suspend fun submitOffice(office: OfficeLock, password: String) {
+        val name = info?.name.orEmpty()
+        when (val result = tryOffice(office, password)) {
+            is DocResult.Success -> readyOffice(result.value, name)
+            is DocResult.Failure -> if (result.error == AppError.WrongPassword) {
+                _state.value = ViewerUiState.NeedsPassword(name, failedAttempt = true)
+            } else {
+                fail(result.error, name)
+            }
+        }
+    }
+
+    private suspend fun unlockOffice(office: OfficeLock, kind: DocKind, details: UnlockDetails) {
+        val name = info?.name.orEmpty()
+        for (candidate in PasswordRules.candidates(kind, details)) {
+            when (val result = tryOffice(office, candidate)) {
+                is DocResult.Success -> {
+                    readyOffice(result.value, name)
+                    return
+                }
+                is DocResult.Failure -> if (result.error != AppError.WrongPassword) {
+                    fail(result.error, name)
+                    return
+                }
+            }
+        }
+        _state.value = ViewerUiState.NeedsPassword(name, failedAttempt = false, detailsFailed = true)
+    }
+
+    private fun closeLock() {
+        try {
+            lock?.close()
+        } catch (_: IOException) {
+            AppLog.w(LogTag.OPEN) { "lock close failed" }
+        }
+        lock = null
     }
 
     private suspend fun readyOther(type: DocumentType, file: FileInfo) {
@@ -80,7 +164,8 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
 
     fun submitPassword(password: String) {
         _state.value = ViewerUiState.Loading
-        viewModelScope.launch { openPdf(password) }
+        val office = lock
+        viewModelScope.launch { if (office != null) submitOffice(office, password) else openPdf(password) }
     }
 
     /** User ke details se bane kuch passwords try karta hai. Details yahan se aage kahin nahi jate. */
@@ -89,6 +174,10 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
         _state.value = ViewerUiState.Loading
         viewModelScope.launch {
             AppLog.i(LogTag.UNLOCK) { "trying kind=$kind" }
+            lock?.let { office ->
+                unlockOffice(office, kind, details)
+                return@launch
+            }
             for (candidate in PasswordRules.candidates(kind, details)) {
                 when (val result = container.pdfOpener.open(uri, candidate)) {
                     is DocResult.Success -> {
@@ -135,6 +224,7 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
     }
 
     private suspend fun record(name: String, size: Long, type: DocumentType) {
+        if (isToolResult(uri.toString())) return
         val keeps = withContext(container.dispatchers.io) { container.uriReader.hasKeptAccess(uri) }
         container.recents.record(
             RecentFile(
@@ -165,7 +255,12 @@ class ViewerViewModel(private val uri: Uri, private val container: AppContainer)
         }
     }
 
+    /** Band karna doosre process ko call hai. Back ki animation us par rukni nahi chahiye. */
     override fun onCleared() {
-        document?.let(::closeQuietly)
+        Thread {
+            document?.let(::closeQuietly)
+            closeLock()
+            decrypted?.delete()
+        }.start()
     }
 }

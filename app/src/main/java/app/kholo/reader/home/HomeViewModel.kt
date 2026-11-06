@@ -11,19 +11,20 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val STOP_TIMEOUT_MS = 5_000L
 
 class HomeViewModel(private val container: AppContainer) : ViewModel() {
-    private val tab = MutableStateFlow(HomeTab.Recent)
     private val pendingCrash = MutableStateFlow(false)
 
-    val state: StateFlow<HomeUiState> = combine(container.recents.files, tab, pendingCrash) { files, tab, crash ->
-        val shown = if (tab == HomeTab.Favorites) files.favoritesNewestFirst() else files
-        HomeUiState(tab, shown, crash)
+    /** Settings se lautne par wahi tab khule. */
+    var lastPage = 0
+
+    // Swipe ke beech dono lists ek saath dikhti hain, isliye dono hamesha taiyar rehti hain.
+    val state: StateFlow<HomeUiState> = combine(container.recents.files, pendingCrash) { files, crash ->
+        HomeUiState(files, files.favoritesNewestFirst(), crash)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HomeUiState())
 
     init {
@@ -32,8 +33,6 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
             pendingCrash.value = crash != null
         }
     }
-
-    fun selectTab(selected: HomeTab) = tab.update { selected }
 
     fun toggleFavorite(uri: String) {
         viewModelScope.launch { container.recents.toggleFavorite(uri) }

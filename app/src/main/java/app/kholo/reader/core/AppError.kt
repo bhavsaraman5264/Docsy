@@ -22,8 +22,28 @@ sealed interface AppError {
         override val messageRes = R.string.error_office_password
     }
 
+    /** Tool ko password wali PDF mili. */
+    data object PdfLocked : AppError {
+        override val messageRes = R.string.error_pdf_locked
+    }
+
+    /** PDF bina password ke khulti hai, par banane wale ne badlav mana kiya hai. */
+    data object PdfRestricted : AppError {
+        override val messageRes = R.string.error_pdf_restricted
+    }
+
     data object FileGone : AppError {
         override val messageRes = R.string.error_file_gone
+    }
+
+    /** File phone me hai, par doosri app ki di hui permission khatam ho gayi. User use dobara chun sakta hai. */
+    data object NeedsAccess : AppError {
+        override val messageRes = R.string.error_needs_access
+    }
+
+    /** PDF engine ne dobara koshish par bhi jawab nahi diya. File kharab nahi hai. */
+    data object PdfBusy : AppError {
+        override val messageRes = R.string.error_pdf_busy
     }
 
     data object Corrupt : AppError {

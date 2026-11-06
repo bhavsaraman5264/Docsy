@@ -42,6 +42,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        resources {
+            // PDF password ke liye sirf AES chahiye. Post-quantum crypto ke ~8 MB tables ka koi kaam nahi.
+            excludes += setOf("org/bouncycastle/pqc/**", "org/bouncycastle/x509/**", "META-INF/versions/**")
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -56,6 +63,20 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+}
+
+// Har release ki mapping.txt rakhte hain, warna testers ki crash report wapas padhi nahi jayegi.
+// Tester ko naya APK bhejne se pehle versionCode badhana, warna purani zip overwrite ho jayegi.
+val archiveReleaseMapping = tasks.register<Zip>("archiveReleaseMapping") {
+    // Compose ka merge task R8 ke baad mapping.txt dobara likhta hai, isliye uske baad hi zip banao.
+    dependsOn("mergeReleaseComposeMapping")
+    from(layout.buildDirectory.file("outputs/mapping/release/mapping.txt"))
+    destinationDirectory.set(rootProject.layout.projectDirectory.dir("release-mappings"))
+    archiveFileName.set("kholo-${android.defaultConfig.versionName}-${android.defaultConfig.versionCode}.zip")
+}
+
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+    finalizedBy(archiveReleaseMapping)
 }
 
 detekt {
@@ -77,9 +98,9 @@ dependencies {
     implementation(libs.androidx.tracing)
     implementation(libs.datastore.preferences)
     implementation(libs.androidx.core)
+    implementation(libs.pdfbox.android)
 
     debugImplementation(libs.compose.ui.tooling)
-    debugImplementation(libs.leakcanary)
 
     testImplementation(libs.junit)
     testImplementation("org.json:json:20250517")

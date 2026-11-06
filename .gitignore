@@ -12,3 +12,9 @@ keystore.properties
 fixtures/generated/
 # Asli documents kabhi commit nahi hone chahiye
 fixtures/private/
+
+# Release ki mapping zips: badi hoti hain, inka backup alag rakhna
+release-mappings/
+
+# JVM crash logs
+hs_err_pid*.log

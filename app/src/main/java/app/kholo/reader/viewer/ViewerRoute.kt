@@ -29,6 +29,7 @@ fun ViewerRoute(
     onBack: () -> Unit,
     onShare: () -> Unit,
     onOpenElsewhere: () -> Unit,
+    onPickAgain: () -> Unit,
     onReport: (String) -> Unit,
 ) {
     val viewModel: ViewerViewModel = viewModel(
@@ -55,6 +56,7 @@ fun ViewerRoute(
             name = current.name,
             onBack = onBack,
             onOpenElsewhere = onOpenElsewhere,
+            onPickAgain = onPickAgain,
             onReport = { onReport("open") },
         )
 
@@ -65,14 +67,30 @@ fun ViewerRoute(
                 onOpenElsewhere = onOpenElsewhere,
                 onReport = { onReport("open") },
                 failed = { error ->
-                    OpenFailedScreen(error, current.name, onBack, onOpenElsewhere) { onReport("open") }
+                    OpenFailedScreen(error, current.name, onBack, onOpenElsewhere, onPickAgain) { onReport("open") }
                 },
             )
             when (current.type) {
-                DocumentType.Csv, DocumentType.Xlsx ->
-                    GridScreen(current.uri, current.type, current.name, current.size, container, actions)
-                DocumentType.Docx, DocumentType.Pptx ->
-                    DocxScreen(current.uri, current.type, current.name, current.size, container, actions)
+                DocumentType.Csv, DocumentType.Xlsx, DocumentType.Xls ->
+                    GridScreen(
+                        uri = current.uri,
+                        type = current.type,
+                        name = current.name,
+                        size = current.size,
+                        container = container,
+                        actions = actions,
+                        content = current.content,
+                    )
+                DocumentType.Docx, DocumentType.Pptx, DocumentType.Doc, DocumentType.Ppt ->
+                    DocxScreen(
+                        uri = current.uri,
+                        type = current.type,
+                        name = current.name,
+                        size = current.size,
+                        container = container,
+                        actions = actions,
+                        content = current.content,
+                    )
                 else -> TextScreen(current.uri, current.name, container, actions)
             }
         }

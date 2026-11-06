@@ -40,7 +40,7 @@ class UriReader(context: Context) {
     } catch (_: FileNotFoundException) {
         DocResult.Failure(AppError.FileGone)
     } catch (_: SecurityException) {
-        DocResult.Failure(AppError.FileGone)
+        DocResult.Failure(AppError.NeedsAccess)
     } catch (_: IOException) {
         DocResult.Failure(AppError.FileGone)
     } catch (_: IllegalArgumentException) {

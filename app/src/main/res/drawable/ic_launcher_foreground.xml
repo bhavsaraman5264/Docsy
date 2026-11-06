@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder icon: final icon naam tay hone par banega. -->
+<!-- Docsy ka logo. Scale aisa hai ki gol icon me bhi page ke kone na katein. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="@color/icon_foreground"
-        android:pathData="M38,30h22l12,12v36a2,2 0,0 1,-2 2H38a2,2 0,0 1,-2 -2V32a2,2 0,0 1,2 -2zM58,34v10h10z" />
+    <group
+        android:scaleX="0.098"
+        android:scaleY="0.098"
+        android:translateX="17.05"
+        android:translateY="17.45">
+        <path
+            android:fillColor="@color/icon_foreground"
+            android:fillType="evenOdd"
+            android:pathData="M216,102L428,102Q436,102 442,108L572,238Q578,244 578,252L578,604Q578,644 538,644L216,644Q176,644 176,604L176,142Q176,102 216,102Z M437,140L538,243L457,243Q437,243 437,223Z M284,362L469,362L469,384L284,384Z M284,410L469,410L469,431L284,431Z M284,457L469,457L469,478L284,478Z M284,503L388,503L388,525L284,525Z" />
+    </group>
 </vector>

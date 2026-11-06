@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.pdf.PdfSandboxHandle
+import androidx.pdf.SandboxedPdfLoader
 import app.kholo.reader.core.file.TempFiles
 import app.kholo.reader.core.file.UriReader
 import app.kholo.reader.core.log.RingBufferTree
@@ -14,6 +16,8 @@ import app.kholo.reader.recents.RecentsRepository
 import app.kholo.reader.report.BugReportBuilder
 import app.kholo.reader.report.CrashRecorder
 import app.kholo.reader.settings.SettingsRepository
+import app.kholo.reader.tools.PdfTools
+import java.io.File
 
 private val Context.appStore: DataStore<Preferences> by preferencesDataStore(name = "kholo")
 
@@ -24,13 +28,24 @@ class AppContainer(
     val crashRecorder: CrashRecorder,
     val dispatchers: AppDispatchers = AppDispatchers(),
 ) {
-    private val store = context.applicationContext.appStore
+    private val appContext = context.applicationContext
+    private val store = appContext.appStore
+    private var pdfEngine: PdfSandboxHandle? = null
     val uriReader = UriReader(context)
     val tempFiles = TempFiles(context)
+    val pdfTools = PdfTools(context, File(context.applicationContext.cacheDir, "open"))
     val contentResolver: ContentResolver = context.applicationContext.contentResolver
     val recents = RecentsRepository(store)
     val settings = SettingsRepository(store)
     val readingState = ReadingStateStore(store)
     val pdfOpener = PdfOpener(context)
     val bugReports = BugReportBuilder(context, logBuffer)
+
+    /**
+     * Engine poore app ke liye ek baar chalu hota hai. Har screen ke band hone par connection band karne se
+     * agla PDF spinner par atak jata tha.
+     */
+    fun warmPdfEngine() {
+        if (pdfEngine == null) pdfEngine = SandboxedPdfLoader.startInitialization(appContext)
+    }
 }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,11 +25,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -37,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,28 +51,23 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.kholo.reader.R
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.LoadState
+import app.kholo.reader.office.OfficeContent
 import app.kholo.reader.open.DocumentType
+import app.kholo.reader.ui.components.BarTextButton
+import app.kholo.reader.ui.components.FindAction
+import app.kholo.reader.ui.components.highlighted
+import app.kholo.reader.ui.components.pinchFontSize
 import app.kholo.reader.ui.theme.Spacing
 import app.kholo.reader.viewer.DocumentScaffold
 import app.kholo.reader.viewer.ReaderActions
+import app.kholo.reader.viewer.findBarOf
 import kotlinx.coroutines.launch
 
 private val READING_WIDTH = 680.dp
 private val CELL_WIDTH = 160.dp
 private const val DEFAULT_FONT_SP = 16
 
-/** Page view saare blocks ek saath banata hai. Isse lambi file Read view me hi tez rehti hai. */
-private const val MAX_PAGE_VIEW_BLOCKS = 4000
-private const val MIN_FONT_SP = 12
-private const val MAX_FONT_SP = 28
-private const val FONT_STEP = 2
 private const val LINE_HEIGHT_RATIO = 1.5
-
-@Composable
-fun FontSizeActions(size: Int, onChange: (Int) -> Unit) {
-    TextButton(onClick = { onChange((size - FONT_STEP).coerceAtLeast(MIN_FONT_SP)) }) { Text("A-") }
-    TextButton(onClick = { onChange((size + FONT_STEP).coerceAtMost(MAX_FONT_SP)) }) { Text("A+") }
-}
 
 @Composable
 fun DocxScreen(
@@ -78,11 +77,16 @@ fun DocxScreen(
     size: Long?,
     container: AppContainer,
     actions: ReaderActions,
+    content: OfficeContent? = null,
 ) {
     val viewModel: DocxViewModel = viewModel(
-        factory = viewModelFactory { initializer { DocxViewModel(uri, type, size, container) } },
+        factory = viewModelFactory { initializer { DocxViewModel(uri, type, size, container, content) } },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val findState by viewModel.find.state.collectAsStateWithLifecycle()
+    val marks = remember(findState.hits, findState.current) { DocMarks(findState.hits, findState.currentHit) }
+    // Badi file tukdon me aati hai, naya hissa aane par usme bhi dhoondho.
+    LaunchedEffect(state) { viewModel.find.rescan() }
     var fontSize by rememberSaveable { mutableIntStateOf(DEFAULT_FONT_SP) }
     val pageMode by container.settings.wordPageView.collectAsStateWithLifecycle(initialValue = true)
     val scope = rememberCoroutineScope()
@@ -91,31 +95,26 @@ fun DocxScreen(
         title = name,
         actions = actions,
         barActions = {
+            if (state is LoadState.Ready) FindAction(viewModel.find::open)
             if (type == DocumentType.Docx) {
-                TextButton(onClick = { scope.launch { container.settings.setWordPageView(!pageMode) } }) {
+                BarTextButton(onClick = { scope.launch { container.settings.setWordPageView(!pageMode) } }) {
                     Text(stringResource(if (pageMode) R.string.view_read else R.string.view_page))
                 }
             }
-            if (!showPage) FontSizeActions(fontSize) { fontSize = it }
         },
+        findBar = findBarOf(viewModel.find, findState),
     ) { modifier ->
-        when (val current = state) {
-            LoadState.Loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            is LoadState.Failed -> actions.failed(current.error)
-            is LoadState.Ready -> if (showPage && current.value.blocks.size <= MAX_PAGE_VIEW_BLOCKS) {
-                DocxPageView(current.value, viewModel, modifier)
-            } else {
-                Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                    LazyColumn(
-                        modifier = Modifier.widthIn(max = READING_WIDTH).fillMaxWidth(),
-                        contentPadding = PaddingValues(Spacing.screenPadding),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.m),
-                    ) {
-                        item { ReadingViewNote(type) }
-                        items(current.value.blocks) { block -> Block(block, fontSize, viewModel) }
-                    }
+        CompositionLocalProvider(LocalDocMarks provides marks) {
+            when (val current = state) {
+                LoadState.Loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                is LoadState.Failed -> actions.failed(current.error)
+                is LoadState.Ready -> if (showPage) {
+                    DocxPageView(current.value, viewModel, modifier, findState.currentHit)
+                } else {
+                    val pinch = modifier.pinchFontSize({ fontSize }) { fontSize = it }
+                    ReadingList(current.value, type, fontSize, viewModel, pinch, findState.currentHit)
                 }
             }
         }
@@ -123,8 +122,36 @@ fun DocxScreen(
 }
 
 @Composable
+private fun ReadingList(
+    document: ParsedDocument,
+    type: DocumentType,
+    fontSize: Int,
+    viewModel: DocxViewModel,
+    modifier: Modifier,
+    hit: DocHit?,
+) {
+    val list = rememberLazyListState()
+    LaunchedEffect(hit) {
+        // Pehla item upar wala note hai.
+        if (hit != null) list.scrollToItem(hit.block + 1)
+    }
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        LazyColumn(
+            state = list,
+            modifier = Modifier.widthIn(max = READING_WIDTH).fillMaxWidth(),
+            contentPadding = PaddingValues(Spacing.screenPadding),
+            verticalArrangement = Arrangement.spacedBy(Spacing.m),
+        ) {
+            item { ReadingViewNote(type) }
+            items(document.blocks) { block -> Block(block, fontSize, viewModel) }
+        }
+    }
+}
+
+@Composable
 private fun ReadingViewNote(type: DocumentType) {
-    val note = if (type == DocumentType.Pptx) R.string.note_slides else R.string.note_reading_view
+    val slides = type == DocumentType.Pptx || type == DocumentType.Ppt
+    val note = if (slides) R.string.note_slides else R.string.note_reading_view
     Text(
         stringResource(note),
         style = MaterialTheme.typography.labelMedium,
@@ -171,7 +198,12 @@ private fun ParagraphBlock(block: DocBlock.Paragraph, fontSize: Int) {
             block.marker?.let {
                 Text("$it  ", fontSize = size.sp, lineHeight = line)
             }
-            Text(block.text, fontSize = size.sp, lineHeight = line, fontWeight = weight)
+            Text(
+                block.text.highlighted(LocalDocMarks.current.ranges(block)),
+                fontSize = size.sp,
+                lineHeight = line,
+                fontWeight = weight,
+            )
         }
     }
 }
@@ -179,6 +211,7 @@ private fun ParagraphBlock(block: DocBlock.Paragraph, fontSize: Int) {
 /** Chaudi table apne andar scroll hoti hai, page ko nahi hilati. */
 @Composable
 private fun TableBlock(block: DocBlock.Table, fontSize: Int) {
+    val marks = LocalDocMarks.current
     Surface(
         shape = MaterialTheme.shapes.small,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -190,7 +223,7 @@ private fun TableBlock(block: DocBlock.Table, fontSize: Int) {
                     row.forEach { cell ->
                         SelectionContainer {
                             Text(
-                                text = cell.text,
+                                text = AnnotatedString(cell.text).highlighted(marks.ranges(cell)),
                                 modifier = Modifier.width(CELL_WIDTH).padding(Spacing.s),
                                 fontSize = (fontSize - 2).sp,
                                 fontWeight = if (index == 0) FontWeight.SemiBold else null,

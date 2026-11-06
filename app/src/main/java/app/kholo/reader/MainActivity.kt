@@ -12,29 +12,45 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.pdf.PdfSandboxHandle
-import androidx.pdf.SandboxedPdfLoader
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.home.HomeScreen
 import app.kholo.reader.home.HomeViewModel
 import app.kholo.reader.report.ReportScreen
 import app.kholo.reader.settings.LanguageStore
 import app.kholo.reader.settings.SettingsScreen
+import app.kholo.reader.tools.ToolsActivity
+import app.kholo.reader.ui.components.IntroPage
+import app.kholo.reader.ui.components.SwipeBack
 import app.kholo.reader.ui.theme.AppTheme
+import kotlinx.coroutines.delay
 
 private const val PDF_WARMUP_DELAY_MS = 500L
+private const val ROUTE_FADE_MS = 180
+private const val INTRO_MS = 900L
+private const val INTRO_FADE_MS = 250
 private const val ROUTE_HOME = "home"
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_REPORT = "report"
 private const val EXTRA_REPORT_CATEGORY = "report_category"
-private val OPEN_TYPES = arrayOf(
+internal val OPEN_TYPES = arrayOf(
     "application/pdf",
     "text/plain",
     "text/csv",
@@ -44,10 +60,12 @@ private val OPEN_TYPES = arrayOf(
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel.sheet.macroEnabled.12",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/msword",
+    "application/vnd.ms-excel",
+    "application/vnd.ms-powerpoint",
 )
 
 class MainActivity : ComponentActivity() {
-    private var sandbox: PdfSandboxHandle? = null
     private val container: AppContainer get() = (application as KholoApp).container
 
     override fun attachBaseContext(newBase: Context) {
@@ -58,7 +76,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         // PDF engine alag process me chalta hai. Screen dikhne ke baad warm karo, taaki app ka start dhima na ho.
-        window.decorView.postDelayed(::warmPdfEngine, PDF_WARMUP_DELAY_MS)
+        window.decorView.postDelayed(container::warmPdfEngine, PDF_WARMUP_DELAY_MS)
         val startCategory = intent.getStringExtra(EXTRA_REPORT_CATEGORY)
         setContent {
             AppTheme(container.settings) {
@@ -71,51 +89,66 @@ class MainActivity : ComponentActivity() {
                 BackHandler(enabled = route != ROUTE_HOME) {
                     if (startCategory != null) finish() else route = ROUTE_HOME
                 }
-                when (route) {
-                    ROUTE_SETTINGS -> SettingsScreen(
-                        settings = container.settings,
-                        onBack = { route = ROUTE_HOME },
-                    )
+                // Sirf app khulne par. Rotate ya Settings se lautne par dobara nahi.
+                var intro by rememberSaveable { mutableStateOf(startCategory == null) }
+                LaunchedEffect(Unit) {
+                    delay(INTRO_MS)
+                    intro = false
+                }
+                Box(Modifier.fillMaxSize()) {
+                    AnimatedContent(
+                        targetState = route,
+                        transitionSpec = { fadeIn(tween(ROUTE_FADE_MS)) togetherWith fadeOut(tween(ROUTE_FADE_MS)) },
+                        label = "route",
+                    ) { shown ->
+                        when (shown) {
+                            ROUTE_SETTINGS -> SwipeBack(onBack = { route = ROUTE_HOME }) {
+                                SettingsScreen(
+                                    settings = container.settings,
+                                    onBack = { route = ROUTE_HOME },
+                                )
+                            }
 
-                    ROUTE_REPORT -> ReportScreen(
-                        container = container,
-                        category = category,
-                        onBack = { if (startCategory != null) finish() else route = ROUTE_HOME },
-                        onSend = ::sendReport,
-                    )
+                            ROUTE_REPORT -> ReportScreen(
+                                container = container,
+                                category = category,
+                                onBack = { if (startCategory != null) finish() else route = ROUTE_HOME },
+                                onSend = ::sendReport,
+                            )
 
-                    else -> {
-                        val homeViewModel: HomeViewModel = viewModel(
-                            factory = viewModelFactory { initializer { HomeViewModel(container) } },
-                        )
-                        HomeScreen(
-                            viewModel = homeViewModel,
-                            onPickFile = { picker.launch(OPEN_TYPES) },
-                            onOpen = { open(Uri.parse(it.uri)) },
-                            onShare = { share(Uri.parse(it.uri)) },
-                            onSettings = { route = ROUTE_SETTINGS },
-                            onReport = {
-                                category = "other"
-                                route = ROUTE_REPORT
-                            },
-                            onCrashReport = {
-                                category = "crash"
-                                route = ROUTE_REPORT
-                            },
-                        )
+                            else -> {
+                                val homeViewModel: HomeViewModel = viewModel(
+                                    factory = viewModelFactory { initializer { HomeViewModel(container) } },
+                                )
+                                HomeScreen(
+                                    viewModel = homeViewModel,
+                                    onPickFile = { picker.launch(OPEN_TYPES) },
+                                    onOpen = { open(Uri.parse(it.uri)) },
+                                    onShare = { share(Uri.parse(it.uri)) },
+                                    onSettings = { route = ROUTE_SETTINGS },
+                                    onReport = {
+                                        category = "other"
+                                        route = ROUTE_REPORT
+                                    },
+                                    onTool = { startActivity(ToolsActivity.intent(this@MainActivity, it)) },
+                                    onCrashReport = {
+                                        category = "crash"
+                                        route = ROUTE_REPORT
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = intro,
+                        enter = EnterTransition.None,
+                        exit = fadeOut(tween(INTRO_FADE_MS)),
+                    ) {
+                        IntroPage()
                     }
                 }
             }
         }
-    }
-
-    private fun warmPdfEngine() {
-        if (!isDestroyed) sandbox = SandboxedPdfLoader.startInitialization(this)
-    }
-
-    override fun onDestroy() {
-        sandbox?.close()
-        super.onDestroy()
     }
 
     private fun openPicked(uri: Uri) {

@@ -287,3 +287,23 @@ write('hostile.xlsx', zip(wbFiles(['Bad'], {
 })));
 const emptyPdf = latin('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Count 0 /Kids [] >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n');
 write('zero-pages.pdf', emptyPdf);
+
+// Bade documents: load aur scroll ki jaanch ke liye.
+const bigDocx = (name, count) => {
+  const body = Array.from({ length: count }, (_, i) => para(`Paragraph ${i + 1}: ordinary sentence text for a long report that wraps onto a second line on most phones.`)).join('');
+  write(name, zip({
+    '[Content_Types].xml': `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`,
+    '_rels/.rels': `${X}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/></Relationships>`,
+    'word/document.xml': `${X}<w:document ${W}><w:body>${body}</w:body></w:document>`,
+  }));
+};
+bigDocx('word-3000.docx', 3000);
+bigDocx('word-30000.docx', 30000);
+const tfd = fs.openSync(path.join(OUT, 'huge.txt'), 'w');
+for (let i = 0; i < 40; i++) {
+  let chunk = '';
+  for (let j = 0; j < 25000; j++) chunk += `Line ${i * 25000 + j + 1}: yeh ek lambi text file ki line hai, यह हिंदी भी है।\n`;
+  fs.writeSync(tfd, chunk);
+}
+fs.closeSync(tfd);
+console.log('huge.txt'.padEnd(30), fs.statSync(path.join(OUT, 'huge.txt')).size);

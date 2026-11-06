@@ -26,6 +26,18 @@ object XlsxCell {
         return if (column in 1..MAX_COLUMN) column - 1 else -1
     }
 
+    /** 0-based column se Excel ka naam: 0 se `A`, 26 se `AA`. */
+    fun columnName(index: Int): String {
+        var value = index + 1
+        val name = StringBuilder()
+        while (value > 0) {
+            value--
+            name.insert(0, 'A' + value % LETTER_BASE)
+            value /= LETTER_BASE
+        }
+        return name.toString()
+    }
+
     /** Bade number aur Aadhaar jaise 12 digit kabhi `1.2E+11` na dikhen. */
     fun plainNumber(raw: String): String = try {
         val scientific = 'E' in raw || 'e' in raw

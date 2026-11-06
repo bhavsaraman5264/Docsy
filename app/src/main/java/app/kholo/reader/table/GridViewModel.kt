@@ -11,21 +11,29 @@ import app.kholo.reader.core.LoadState
 import app.kholo.reader.core.file.SafeZip
 import app.kholo.reader.core.file.readUpTo
 import app.kholo.reader.core.file.toAppError
+import app.kholo.reader.office.OfficeContent
 import app.kholo.reader.open.DocumentType
 import app.kholo.reader.table.csv.CsvIndexSource
 import app.kholo.reader.table.csv.CsvSniffer
+import app.kholo.reader.table.xls.XlsSource
+import app.kholo.reader.table.xls.XlsWorkbook
 import app.kholo.reader.table.xlsx.SharedStringsFile
 import app.kholo.reader.table.xlsx.XlsxPackage
 import app.kholo.reader.table.xlsx.XlsxSqliteSource
 import app.kholo.reader.table.xlsx.XlsxStyles
+import app.kholo.reader.viewer.FindController
+import app.kholo.reader.viewer.MAX_FIND_HITS
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParserException
@@ -34,11 +42,15 @@ const val PAGE_ROWS = 128
 private const val CACHED_PAGES = 48
 private const val SAMPLE_BYTES = 64 * 1024
 
+/** Sheet ki row ka position (Excel ka row number nahi) aur 0-based column. */
+data class GridHit(val row: Int, val column: Int)
+
 class GridViewModel(
     private val uri: Uri,
     private val type: DocumentType,
     private val size: Long?,
     private val container: AppContainer,
+    private val content: OfficeContent? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadState<TableSource>>(LoadState.Loading)
     val state: StateFlow<LoadState<TableSource>> = _state.asStateFlow()
@@ -53,6 +65,8 @@ class GridViewModel(
     private var tempFile: File? = null
     private var source: TableSource? = null
 
+    val find = FindController<GridHit>(viewModelScope, container.dispatchers.io, ::scan)
+
     init {
         viewModelScope.launch {
             _state.value = try {
@@ -60,7 +74,7 @@ class GridViewModel(
             } catch (e: IOException) {
                 LoadState.Failed(e.toAppError())
             } catch (_: SecurityException) {
-                LoadState.Failed(AppError.FileGone)
+                LoadState.Failed(AppError.NeedsAccess)
             } catch (_: XmlPullParserException) {
                 LoadState.Failed(AppError.Corrupt)
             } catch (_: IllegalArgumentException) {
@@ -74,11 +88,49 @@ class GridViewModel(
     }
 
     private fun open(): TableSource {
-        val suffix = if (type == DocumentType.Xlsx) ".xlsx" else ".csv"
-        val file = container.tempFiles.copy(uri, suffix, size).also { tempFile = it }
-        val opened = if (type == DocumentType.Xlsx) openXlsx(file) else openCsv(file)
+        val opened = if (content is OfficeContent.Sheet) {
+            XlsSource(XlsWorkbook(content.workbook))
+        } else {
+            openFile()
+        }
         source = opened
         return opened
+    }
+
+    private fun openFile(): TableSource {
+        val suffix = if (type == DocumentType.Xlsx) ".xlsx" else ".csv"
+        // Password wali file pehle hi khul kar private cache me hai, aur use ViewerViewModel mitata hai.
+        val file = (content as? OfficeContent.Package)?.file
+            ?: container.tempFiles.copy(uri, suffix, size).also { tempFile = it }
+        return if (type == DocumentType.Xlsx) openXlsx(file) else openCsv(file)
+    }
+
+    /** Sirf khuli sheet me. Rows pages me aati hain, isliye badi file bhi memory me nahi aati. */
+    private suspend fun scan(query: String, emit: (List<GridHit>) -> Unit) {
+        val table = source ?: return
+        val total = table.info.first { it.finished }.rowCount
+        var start = 0
+        var found = 0
+        try {
+            while (start < total && found < MAX_FIND_HITS) {
+                coroutineContext.ensureActive()
+                val hits = ArrayList<GridHit>()
+                table.rows(start, PAGE_ROWS).forEachIndexed { offset, row ->
+                    row.cells.forEachIndexed { column, cell ->
+                        if (cell.contains(query, ignoreCase = true)) hits += GridHit(start + offset, column)
+                    }
+                }
+                if (hits.isNotEmpty()) emit(hits)
+                found += hits.size
+                start += PAGE_ROWS
+            }
+        } catch (_: IOException) {
+            // Jitna mila utna dikhao, kharab hisse par search nahi rukna chahiye.
+        } catch (_: SQLiteException) {
+            // Viewer band ho raha hai.
+        } catch (_: IllegalStateException) {
+            // Viewer band ho raha hai.
+        }
     }
 
     private fun openCsv(file: File): TableSource {
@@ -153,7 +205,10 @@ class GridViewModel(
         pages.evictAll()
         io.launch {
             source?.selectSheet(index)
-            withContext(container.dispatchers.main) { _version.value++ }
+            withContext(container.dispatchers.main) {
+                _version.value++
+                find.rescan()
+            }
         }
     }
 

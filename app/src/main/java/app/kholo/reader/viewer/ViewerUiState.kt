@@ -3,6 +3,7 @@ package app.kholo.reader.viewer
 import android.net.Uri
 import androidx.pdf.PdfDocument
 import app.kholo.reader.core.AppError
+import app.kholo.reader.office.OfficeContent
 import app.kholo.reader.open.DocumentType
 import app.kholo.reader.pdf.ReadingState
 
@@ -20,7 +21,13 @@ sealed interface ViewerUiState {
     data class Ready(val doc: OpenDocument) : ViewerUiState
 
     /** PDF ke alawa har file: uski apni screen use kholti hai. */
-    data class Other(val type: DocumentType, val uri: Uri, val name: String, val size: Long?) : ViewerUiState
+    data class Other(
+        val type: DocumentType,
+        val uri: Uri,
+        val name: String,
+        val size: Long?,
+        val content: OfficeContent? = null,
+    ) : ViewerUiState
 
     data class Failed(val error: AppError, val name: String?) : ViewerUiState
 }

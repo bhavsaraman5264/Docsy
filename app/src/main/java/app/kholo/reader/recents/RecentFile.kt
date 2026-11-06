@@ -1,10 +1,16 @@
 package app.kholo.reader.recents
 
+import app.kholo.reader.BuildConfig
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
 private const val MAX_RECENTS = 100
+
+/** Tool ka nateeja app ki temporary file hai. Recent me rakha to kuch der baad khulega hi nahi. */
+private const val TOOL_RESULT_PREFIX = "content://${BuildConfig.APPLICATION_ID}.files/"
+
+fun isToolResult(uri: String): Boolean = uri.startsWith(TOOL_RESULT_PREFIX)
 
 data class RecentFile(
     val uri: String,
@@ -102,5 +108,5 @@ private fun parseRecents(json: String): List<RecentFile> {
             favoritedAt = item.optLong("favoritedAt", if (favorite) openedAt else 0L),
             keepsAccess = item.optBoolean("keepsAccess", false),
         )
-    }.deduped()
+    }.filterNot { isToolResult(it.uri) }.deduped()
 }

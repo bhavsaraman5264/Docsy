@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -63,10 +64,16 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.kholo.reader.R
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.LoadState
+import app.kholo.reader.office.OfficeContent
 import app.kholo.reader.open.DocumentType
+import app.kholo.reader.ui.components.FindAction
+import app.kholo.reader.ui.components.FindCurrentColor
+import app.kholo.reader.ui.components.FindHitColor
 import app.kholo.reader.ui.theme.Spacing
 import app.kholo.reader.viewer.DocumentScaffold
+import app.kholo.reader.viewer.FindState
 import app.kholo.reader.viewer.ReaderActions
+import app.kholo.reader.viewer.findBarOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -77,6 +84,7 @@ private val SCROLLBAR_WIDTH = 28.dp
 private val THUMB_HEIGHT = 56.dp
 private const val MAX_CELL_CHARS = 256
 private const val REFRESH_MS = 700L
+private const val MIN_SCROLLBAR_ITEMS = 40
 
 @Composable
 fun GridScreen(
@@ -86,25 +94,32 @@ fun GridScreen(
     size: Long?,
     container: AppContainer,
     actions: ReaderActions,
+    content: OfficeContent? = null,
 ) {
     val viewModel: GridViewModel = viewModel(
-        factory = viewModelFactory { initializer { GridViewModel(uri, type, size, container) } },
+        factory = viewModelFactory { initializer { GridViewModel(uri, type, size, container, content) } },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    DocumentScaffold(name, actions) { modifier ->
+    val findState by viewModel.find.state.collectAsStateWithLifecycle()
+    DocumentScaffold(
+        title = name,
+        actions = actions,
+        barActions = { if (state is LoadState.Ready) FindAction(viewModel.find::open) },
+        findBar = findBarOf(viewModel.find, findState),
+    ) { modifier ->
         when (val current = state) {
             LoadState.Loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
             is LoadState.Failed -> actions.failed(current.error)
-            is LoadState.Ready -> Table(current.value, viewModel, modifier)
+            is LoadState.Ready -> Table(current.value, viewModel, findState, modifier)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Table(source: TableSource, viewModel: GridViewModel, modifier: Modifier) {
+private fun Table(source: TableSource, viewModel: GridViewModel, find: FindState<GridHit>, modifier: Modifier) {
     val info by source.info.collectAsStateWithLifecycle()
     val version by viewModel.version.collectAsStateWithLifecycle()
     var sheet by remember { mutableIntStateOf(0) }
@@ -125,8 +140,19 @@ private fun Table(source: TableSource, viewModel: GridViewModel, modifier: Modif
         )
         val list = rememberLazyListState()
         val horizontal = rememberScrollState()
+        val columnPx = with(LocalDensity.current) { COLUMN_WIDTH.toPx() }
+        val hit = find.currentHit
+        LaunchedEffect(hit) {
+            if (hit != null) {
+                list.scrollToItem(hit.row)
+                horizontal.scrollTo((hit.column * columnPx).toInt())
+            }
+        }
+        val marks = remember(find.hits, find.current) {
+            find.hits.groupBy { it.row }.mapValues { (_, hits) -> hits.associate { it.column to (it == hit) } }
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            GridBody(info, list, horizontal, viewModel, version) { opened = it }
+            GridBody(info, list, horizontal, viewModel, version, marks) { opened = it }
             FastScrollbar(list, info.rowCount, Modifier.align(Alignment.CenterEnd))
         }
         if (source.sheets.size > 1) {
@@ -164,7 +190,7 @@ private fun Table(source: TableSource, viewModel: GridViewModel, modifier: Modif
 private fun rowLabel(info: TableInfo): String = when {
     info.failed -> stringResource(R.string.table_partial)
     info.finished && info.rowCount == 0 -> stringResource(R.string.table_empty)
-    info.finished -> stringResource(R.string.table_rows, info.rowCount)
+    info.finished -> pluralStringResource(R.plurals.table_rows, info.rowCount, info.rowCount)
     else -> stringResource(R.string.table_loading, info.rowCount)
 }
 
@@ -175,10 +201,13 @@ private fun GridBody(
     horizontal: ScrollState,
     viewModel: GridViewModel,
     version: Int,
+    marks: Map<Int, Map<Int, Boolean>>,
     onCell: (String) -> Unit,
 ) {
     val measurer = rememberTextMeasurer(cacheSize = 512)
     val density = LocalDensity.current
+    // Cell ka text phone ki font setting ke saath badhta hai, isliye row bhi.
+    val rowHeight = ROW_HEIGHT * density.fontScale.coerceAtLeast(1f)
     val columnPx = with(density) { COLUMN_WIDTH.toPx() }
     val numberPx = with(density) { NUMBER_WIDTH.toPx() }
     val total = NUMBER_WIDTH + COLUMN_WIDTH * info.columnCount.coerceAtLeast(1)
@@ -192,7 +221,7 @@ private fun GridBody(
     val metrics = GridMetrics(columnPx, numberPx)
     Box(Modifier.fillMaxSize().horizontalScroll(horizontal)) {
         Column(Modifier.width(total).fillMaxHeight()) {
-            Canvas(Modifier.fillMaxWidth().height(ROW_HEIGHT).background(colors.header)) {
+            Canvas(Modifier.fillMaxWidth().height(rowHeight).background(colors.header)) {
                 drawRow(info.header, "", horizontal.value, metrics, measurer, colors, bold = true)
             }
             LazyColumn(state = list, modifier = Modifier.fillMaxSize()) {
@@ -201,7 +230,7 @@ private fun GridBody(
                     Canvas(
                         Modifier
                             .fillMaxWidth()
-                            .height(ROW_HEIGHT)
+                            .height(rowHeight)
                             .pointerInput(row) {
                                 detectTapGestures { tap ->
                                     val column = ((tap.x - numberPx) / columnPx).toInt()
@@ -217,6 +246,7 @@ private fun GridBody(
                             measurer = measurer,
                             colors = colors,
                             bold = false,
+                            marks = marks[index],
                         )
                     }
                 }
@@ -238,6 +268,7 @@ private fun DrawScope.drawRow(
     measurer: TextMeasurer,
     colors: GridColors,
     bold: Boolean,
+    marks: Map<Int, Boolean>? = null,
 ) {
     val style = TextStyle(
         color = colors.text,
@@ -251,9 +282,17 @@ private fun DrawScope.drawRow(
     for (i in first..minOf(last, cells.lastIndex)) {
         val text = cells[i].take(MAX_CELL_CHARS).replace('\n', ' ')
         if (text.isEmpty()) continue
+        val mark = marks?.get(i)
+        if (mark != null) {
+            drawRect(
+                color = if (mark) FindCurrentColor else FindHitColor,
+                topLeft = Offset(metrics.number + i * metrics.column, 0f),
+                size = Size(metrics.column, size.height),
+            )
+        }
         val layout = measurer.measure(
             text = text,
-            style = style,
+            style = if (mark != null) style.copy(color = Color.Black) else style,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             constraints = cellConstraints,
@@ -279,8 +318,8 @@ private fun DrawScope.drawRow(
 
 /** Lakhon rows me ungli se kisi bhi jagah tez pahunchne ke liye. */
 @Composable
-private fun FastScrollbar(list: LazyListState, rowCount: Int, modifier: Modifier) {
-    if (rowCount < PAGE_ROWS) return
+fun FastScrollbar(list: LazyListState, rowCount: Int, modifier: Modifier) {
+    if (rowCount < MIN_SCROLLBAR_ITEMS) return
     val scope = rememberCoroutineScope()
     var height by remember { mutableIntStateOf(1) }
     val density = LocalDensity.current

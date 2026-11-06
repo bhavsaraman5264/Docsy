@@ -4,77 +4,89 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-private val Ink = Color(0xFF1C1C1E)
-private val Paper = Color(0xFFFFFFFF)
-private val Mist = Color(0xFFF2F2F4)
-private val Line = Color(0xFFE5E5E7)
-private val Slate = Color(0xFF6B6B70)
+private val Espresso = Color(0xFF3B2A20)
+private val Biscuit = Color(0xFFEFE3D4)
+private val Latte = Color(0xFFF5EDE3)
+private val Oat = Color(0xFFEBDFD0)
+private val Line = Color(0xFFDCCBB8)
+private val Mocha = Color(0xFF76604F)
+private val Coffee = Color(0xFF6F4E37)
+private val Foam = Color(0xFFFFF8F0)
 
-private val Night = Color(0xFF000000)
-private val Coal = Color(0xFF121214)
-private val Graphite = Color(0xFF1E1E20)
-private val Ash = Color(0xFF2C2C2E)
-private val Silver = Color(0xFFAEAEB2)
-private val Fog = Color(0xFFE5E5EA)
+private val Roast = Color(0xFF17100C)
+private val Bean = Color(0xFF1F1611)
+private val Grounds = Color(0xFF2B1F18)
+private val Husk = Color(0xFF3A2A21)
+private val DarkCoffee = Color(0xFF4A3226)
+private val Caramel = Color(0xFFC4AE9B)
+private val Crema = Color(0xFFD7B899)
+private val Steam = Color(0xFFF2E6D9)
+private val DeepRoast = Color(0xFF2B1A12)
 
-/** Sirf safed aur syahi. Rang file type ke liye bachaya hai, Material ka baingani tint kahin nahi aana chahiye. */
+/** Coffee wali halki theme: latte kagaz, espresso syahi. Tez rang sirf file type ke liye bachaya hai. */
 val LightColors = lightColorScheme(
-    primary = Ink,
-    onPrimary = Paper,
-    primaryContainer = Mist,
-    onPrimaryContainer = Ink,
-    secondary = Slate,
-    onSecondary = Paper,
-    secondaryContainer = Mist,
-    onSecondaryContainer = Ink,
-    tertiary = Slate,
-    background = Paper,
-    onBackground = Ink,
-    surface = Paper,
-    onSurface = Ink,
-    surfaceVariant = Mist,
-    onSurfaceVariant = Slate,
-    surfaceTint = Paper,
-    surfaceContainerLowest = Paper,
-    surfaceContainerLow = Paper,
-    surfaceContainer = Paper,
-    surfaceContainerHigh = Mist,
-    surfaceContainerHighest = Mist,
-    outline = Slate,
+    primary = Coffee,
+    onPrimary = Foam,
+    primaryContainer = Oat,
+    onPrimaryContainer = Espresso,
+    secondary = Mocha,
+    onSecondary = Foam,
+    secondaryContainer = Oat,
+    onSecondaryContainer = Espresso,
+    tertiary = Mocha,
+    background = Latte,
+    onBackground = Espresso,
+    surface = Latte,
+    onSurface = Espresso,
+    surfaceVariant = Oat,
+    onSurfaceVariant = Mocha,
+    surfaceTint = Latte,
+    surfaceContainerLowest = Latte,
+    surfaceContainerLow = Latte,
+    surfaceContainer = Biscuit,
+    surfaceContainerHigh = Oat,
+    surfaceContainerHighest = Oat,
+    outline = Mocha,
     outlineVariant = Line,
     error = Color(0xFFB3261E),
 )
 
-/** Black ke saath grey. */
+/** Wahi coffee, gehri bhuni hui. */
 val DarkColors = darkColorScheme(
-    primary = Fog,
-    onPrimary = Ink,
-    primaryContainer = Ash,
-    onPrimaryContainer = Fog,
-    secondary = Silver,
-    onSecondary = Ink,
-    secondaryContainer = Ash,
-    onSecondaryContainer = Fog,
-    tertiary = Silver,
-    background = Night,
-    onBackground = Fog,
-    surface = Coal,
-    onSurface = Fog,
-    surfaceVariant = Graphite,
-    onSurfaceVariant = Silver,
-    surfaceTint = Coal,
-    surfaceContainerLowest = Night,
-    surfaceContainerLow = Coal,
-    surfaceContainer = Coal,
-    surfaceContainerHigh = Graphite,
-    surfaceContainerHighest = Ash,
-    outline = Silver,
-    outlineVariant = Ash,
+    primary = Crema,
+    onPrimary = DeepRoast,
+    primaryContainer = Husk,
+    onPrimaryContainer = Steam,
+    secondary = Caramel,
+    onSecondary = DeepRoast,
+    secondaryContainer = Husk,
+    onSecondaryContainer = Steam,
+    tertiary = Caramel,
+    background = Roast,
+    onBackground = Steam,
+    surface = Bean,
+    onSurface = Steam,
+    surfaceVariant = Grounds,
+    onSurfaceVariant = Caramel,
+    surfaceTint = Bean,
+    surfaceContainerLowest = Roast,
+    surfaceContainerLow = Bean,
+    surfaceContainer = Grounds,
+    surfaceContainerHigh = Husk,
+    surfaceContainerHighest = Husk,
+    outline = Caramel,
+    outlineVariant = Husk,
     error = Color(0xFFFFB4AB),
 )
 
-val ReaderBackgroundLight = Color(0xFFEDEDEF)
-val ReaderBackgroundDark = Night
+/** Top bar, tabs aur status bar ka coffee rang. Dono theme me bar gehra hai, isliye icons hamesha halke. */
+data class BarColors(val container: Color, val content: Color, val quiet: Color)
+
+val LightBar = BarColors(container = Coffee, content = Foam, quiet = Color(0xFFE6D5C3))
+val DarkBar = BarColors(container = DarkCoffee, content = Color(0xFFF5E6D3), quiet = Color(0xFFD9C4B0))
+
+val ReaderBackgroundLight = Color(0xFFEDE2D6)
+val ReaderBackgroundDark = Roast
 val FavoriteStar = Color(0xFFE8A200)
 
 /** File type ka rang: dekhte hi pata chale kaunsi file hai. */
@@ -83,5 +95,5 @@ fun fileTypeColor(label: String, dark: Boolean): Color = when (label) {
     "DOC" -> if (dark) Color(0xFF8AB4F8) else Color(0xFF1A5FB4)
     "XLS" -> if (dark) Color(0xFF81C995) else Color(0xFF1B7F3B)
     "PPT" -> if (dark) Color(0xFFFDB57A) else Color(0xFFB95000)
-    else -> if (dark) Silver else Slate
+    else -> if (dark) Caramel else Mocha
 }

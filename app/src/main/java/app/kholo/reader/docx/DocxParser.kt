@@ -22,6 +22,7 @@ private const val TWIPS_PER_POINT = 20f
 private const val HALF_POINTS = 2f
 private const val EMU_PER_POINT = 12_700f
 private const val DEFAULT_SIZE_PT = 11f
+private const val FIRST_UPDATE_BLOCKS = 100
 private const val MAX_FONT_PT = 200f
 private const val MAX_LIST_LEVEL = 8
 private const val HEX_RADIX = 16
@@ -52,9 +53,10 @@ class DocxParser(private val zip: SafeZip) {
     }
 
     @Suppress("CyclomaticComplexMethod") // XML tag ka switch, todne se padhna mushkil hoga.
-    fun parse(): ParsedDocument {
+    fun parse(onProgress: (ParsedDocument) -> Unit = {}): ParsedDocument {
         val stream = zip.open("word/document.xml") ?: throw IOException("no document")
         val blocks = mutableListOf<DocBlock>()
+        var nextUpdate = FIRST_UPDATE_BLOCKS
         stream.use { input ->
             val parser = safeXml(input)
             var depth = 0
@@ -86,7 +88,13 @@ class DocxParser(private val zip: SafeZip) {
                         "p" -> {
                             val paragraph = readParagraph(parser, blocks)
                             when {
-                                depth == 0 -> if (paragraph != null) blocks += paragraph
+                                depth == 0 -> if (paragraph != null) {
+                                    blocks += paragraph
+                                    if (blocks.size >= nextUpdate) {
+                                        nextUpdate *= 2
+                                        onProgress(ParsedDocument(blocks.toList(), page.sanitized()))
+                                    }
+                                }
                                 paragraph != null -> {
                                     if (cellText.isNotEmpty()) {
                                         cellText.append('\n')

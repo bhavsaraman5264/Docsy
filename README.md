@@ -1,4 +1,4 @@
-# Kholo (working name)
+# Docsy
 
 India ke phones ke liye tez, offline, no-trap document opener. Android only.
 

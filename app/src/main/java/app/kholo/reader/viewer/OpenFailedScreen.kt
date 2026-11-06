@@ -26,6 +26,7 @@ fun OpenFailedScreen(
     name: String?,
     onBack: () -> Unit,
     onOpenElsewhere: () -> Unit,
+    onPickAgain: () -> Unit,
     onReport: () -> Unit,
 ) {
     Scaffold(topBar = {
@@ -37,7 +38,11 @@ fun OpenFailedScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.s),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (error != AppError.FileGone) {
+                    if (error == AppError.NeedsAccess) {
+                        Button(onClick = onPickAgain, shape = MaterialTheme.shapes.small) {
+                            Text(stringResource(R.string.tool_pick_file))
+                        }
+                    } else if (error != AppError.FileGone) {
                         Button(onClick = onOpenElsewhere, shape = MaterialTheme.shapes.small) {
                             Text(stringResource(R.string.action_open_elsewhere))
                         }

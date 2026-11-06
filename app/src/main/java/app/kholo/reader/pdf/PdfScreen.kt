@@ -1,7 +1,6 @@
 package app.kholo.reader.pdf
 
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -9,15 +8,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -41,13 +43,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -58,7 +58,9 @@ import androidx.pdf.PdfRect
 import app.kholo.reader.R
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.ui.components.AppTopBar
+import app.kholo.reader.ui.components.scaledBarHeight
 import app.kholo.reader.ui.theme.KholoTheme
+import app.kholo.reader.ui.theme.LocalBarColors
 import app.kholo.reader.ui.theme.LocalReaderBackground
 import app.kholo.reader.ui.theme.ReaderBackgroundDark
 import app.kholo.reader.ui.theme.Spacing
@@ -106,22 +108,14 @@ fun PdfScreen(
         }
     }
     val density = LocalDensity.current
-    LaunchedEffect(density) { host.setTopInset(with(density) { TOP_BAR_HEIGHT.roundToPx() }) }
+    val topBar = scaledBarHeight(TOP_BAR_HEIGHT)
+    LaunchedEffect(density, topBar) { host.setTopInset(with(density) { topBar.roundToPx() }) }
     LaunchedEffect(state.night) { host.setNight(state.night) }
     LaunchedEffect(state.rotation) { host.setPageRotation(state.rotation) }
     SearchEffect(state.search, host)
     BackHandler(enabled = state.search != null) { viewModel.closeSearch() }
 
     val background = if (state.night) ReaderBackgroundDark else LocalReaderBackground.current
-    val window = LocalActivity.current?.window
-    val rootView = LocalView.current
-    LaunchedEffect(background, window) {
-        // Night page ke upar status bar ke icons bhi halke hon.
-        if (window != null) {
-            val lightBars = background != ReaderBackgroundDark
-            WindowCompat.getInsetsController(window, rootView).isAppearanceLightStatusBars = lightBars
-        }
-    }
 
     Box(Modifier.fillMaxSize().background(background)) {
         // PDF status bar, navigation bar aur notch ke neeche kabhi nahi jayega.
@@ -132,6 +126,12 @@ fun PdfScreen(
                 .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
         )
         ReaderControlsTheme(night = state.night) {
+            // Controls chhupne par bhi status bar coffee rahe, warna halke icons kho jayenge.
+            Spacer(
+                Modifier.fillMaxWidth()
+                    .windowInsetsTopHeight(WindowInsets.statusBars)
+                    .background(LocalBarColors.current.container),
+            )
             AnimatedVisibility(state.controlsVisible, enter = fadeIn(), exit = fadeOut()) {
                 val search = state.search
                 if (search != null) {

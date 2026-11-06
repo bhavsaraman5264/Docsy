@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Kholo</string>
+    <string name="app_name" translatable="false">Docsy</string>
     <string name="action_open_file">Open file</string>
     <string name="action_open">Open</string>
     <string name="action_settings">Settings</string>
@@ -28,6 +28,7 @@
     <string name="action_remove_recent">Remove from recent</string>
     <string name="tab_recent">Recent</string>
     <string name="tab_favorites">Favorites</string>
+    <string name="intro_tagline">Every file, just a tap away</string>
     <string name="home_empty_title">Nothing here yet</string>
     <string name="home_empty_hint">Files you open will show up here</string>
     <string name="favorites_empty">No favorites yet</string>
@@ -58,6 +59,8 @@
     <string name="report_other">Other</string>
     <string name="crash_title">The app closed last time</string>
     <string name="crash_body">Send a report? It has no file names or file content.</string>
+    <string name="error_needs_access">Access needed again. Choose this file once more.</string>
+    <string name="error_pdf_busy">Couldn\'t open this PDF right now. Please try again.</string>
     <string name="error_file_gone">This file is no longer available</string>
     <string name="error_corrupt">This file won\'t open</string>
     <string name="error_empty">This file is empty</string>
@@ -66,14 +69,17 @@
     <string name="error_too_large">This file is too large to open</string>
     <string name="error_wrong_password">That password didn\'t work</string>
     <string name="error_password_unsupported">Password PDFs can\'t open on this Android version</string>
-    <string name="error_office_password">Password-protected Word and Excel files aren\'t supported yet</string>
-    <string name="table_rows">%1$,d rows</string>
+    <string name="error_office_password">This old file uses a password type that isn\'t supported yet</string>
+    <plurals name="table_rows">
+        <item quantity="one">%1$,d row</item>
+        <item quantity="other">%1$,d rows</item>
+    </plurals>
     <string name="table_loading">Loading… %1$,d rows</string>
     <string name="table_empty">This sheet has no table</string>
     <string name="table_partial">Part of this file couldn\'t be read</string>
-    <string name="text_truncated">Only the first 16 MB of this file is shown</string>
     <string name="note_reading_view">Layout may differ from Word</string>
     <string name="note_slides">Text and images only</string>
+    <string name="note_text_only">Text only. Old file formats don\'t show pictures or styling.</string>
     <string name="note_skipped">Some content couldn\'t be shown here</string>
     <string name="slide_number">Slide %1$d</string>
     <string name="view_page">Page</string>
@@ -92,5 +98,50 @@
     <string name="unlock_mobile">Registered mobile (optional)</string>
     <string name="unlock_bank_note">Every bank uses its own format, so this may not work. The password box below always does.</string>
     <string name="unlock_details_failed">Didn\'t open with these details. Check them, or type the password below.</string>
+    <string name="tab_tools">Tools</string>
+    <string name="tool_photos">Photos to PDF</string>
+    <string name="tool_photos_hint">Turn photos into one PDF</string>
+    <string name="tool_scan">Scan to PDF</string>
+    <string name="tool_scan_hint">Take photos of pages</string>
+    <string name="tool_merge">Merge PDFs</string>
+    <string name="tool_merge_hint">Join files into one</string>
+    <string name="tool_split">Split PDF</string>
+    <string name="tool_split_hint">Keep a range of pages</string>
+    <string name="tool_organize">Organize pages</string>
+    <string name="tool_organize_hint">Reorder or remove pages</string>
+    <string name="tool_compress">Compress PDF</string>
+    <string name="tool_compress_hint">Make a file smaller for forms and WhatsApp</string>
+    <string name="tool_lock">Add password</string>
+    <string name="tool_lock_hint">Protect a PDF</string>
+    <string name="tool_unlock">Remove password</string>
+    <string name="tool_unlock_hint">You need to know the password</string>
+    <string name="tool_text">PDF to text</string>
+    <string name="tool_text_hint">Get the text out of a PDF</string>
+    <string name="tool_working">Working…</string>
+    <string name="tool_done">Done</string>
+    <string name="tool_saved">Saved</string>
+    <string name="tool_size_change" translatable="false">%1$s → %2$s</string>
+    <string name="tool_add_more">Add more</string>
+    <string name="tool_add_page">Add a page</string>
+    <string name="tool_pick_file">Choose a file</string>
+    <string name="tool_make_pdf">Make PDF</string>
+    <string name="tool_page">Page %1$d</string>
+    <string name="tool_total_pages">%1$d pages</string>
+    <string name="tool_from_page">From page</string>
+    <string name="tool_to_page">To page</string>
+    <string name="compress_smallest">As small as possible</string>
+    <string name="compress_100">Under 100 KB</string>
+    <string name="compress_200">Under 200 KB</string>
+    <string name="compress_500">Under 500 KB</string>
+    <string name="compress_1000">Under 1 MB</string>
+    <string name="compress_missed">Couldn\'t reach that size. This is the smallest it got.</string>
+    <string name="compress_no_images">This PDF has no photos to shrink, so the size barely changes.</string>
+    <string name="action_save">Save</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_move_up">Move up</string>
+    <string name="action_move_down">Move down</string>
+    <string name="error_pdf_locked">This PDF has a password. Remove it first with the Remove password tool.</string>
     <string name="error_no_app">No app found for this</string>
+    <string name="text_none_found">No text found. This looks like a scanned PDF.</string>
+    <string name="error_pdf_restricted">The owner of this PDF has blocked this change.</string>
 </resources>

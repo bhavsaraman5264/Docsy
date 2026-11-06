@@ -69,6 +69,12 @@ fun InputStream.readUpTo(max: Int): ByteArray {
 fun Throwable.toAppError(): AppError = when (this) {
     is TempFiles.OutOfSpace -> AppError.NoSpace
     is SafeZip.TooBig -> AppError.TooLarge
-    is java.io.FileNotFoundException, is SecurityException -> AppError.FileGone
+    is app.kholo.reader.office.UnsupportedOffice -> AppError.Unsupported
+    is SecurityException -> AppError.NeedsAccess
+    is java.io.FileNotFoundException -> if (isDiskFull()) AppError.NoSpace else AppError.FileGone
+    is IOException -> if (isDiskFull()) AppError.NoSpace else AppError.Corrupt
     else -> AppError.Corrupt
 }
+
+/** Android disk bhar jane ka alag exception nahi deta, sirf message me ENOSPC aata hai. */
+private fun Throwable.isDiskFull(): Boolean = message.orEmpty().contains("ENOSPC")

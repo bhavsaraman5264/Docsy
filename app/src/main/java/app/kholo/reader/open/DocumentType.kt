@@ -15,6 +15,11 @@ enum class DocumentType {
     Xlsx,
     Pptx,
 
+    /** Word, Excel aur PowerPoint 97-2003. [LegacyOffice] ko andar se dekhne ke baad milte hain. */
+    Doc,
+    Xls,
+    Ppt,
+
     /** Purani DOC/XLS/PPT, ya password wali Office file. Dono OLE2 hoti hain. */
     LegacyOffice,
     Empty,
@@ -27,9 +32,9 @@ enum class DocumentType {
             Pdf -> "PDF"
             Text -> "TXT"
             Csv -> "CSV"
-            Docx -> "DOC"
-            Xlsx -> "XLS"
-            Pptx -> "PPT"
+            Docx, Doc -> "DOC"
+            Xlsx, Xls -> "XLS"
+            Pptx, Ppt -> "PPT"
             else -> "FILE"
         }
 

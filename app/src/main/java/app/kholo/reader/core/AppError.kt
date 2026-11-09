@@ -22,6 +22,11 @@ sealed interface AppError {
         override val messageRes = R.string.error_office_password
     }
 
+    /** Word to PDF ko password wali Word file mili. */
+    data object WordLocked : AppError {
+        override val messageRes = R.string.error_word_locked
+    }
+
     /** Tool ko password wali PDF mili. */
     data object PdfLocked : AppError {
         override val messageRes = R.string.error_pdf_locked

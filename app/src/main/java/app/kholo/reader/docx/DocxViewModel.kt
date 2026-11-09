@@ -1,7 +1,6 @@
 package app.kholo.reader.docx
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,7 +8,6 @@ import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.AppError
 import app.kholo.reader.core.LoadState
 import app.kholo.reader.core.file.SafeZip
-import app.kholo.reader.core.file.readUpTo
 import app.kholo.reader.core.file.toAppError
 import app.kholo.reader.office.OfficeContent
 import app.kholo.reader.office.PptParser
@@ -29,7 +27,6 @@ import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParserException
 
 private const val MAX_IMAGE_SIDE = 1400
-private const val MAX_IMAGE_BYTES = 32 * 1024 * 1024
 
 class DocxViewModel(
     private val uri: Uri,
@@ -96,18 +93,7 @@ class DocxViewModel(
 
     /** Tasveer dikhne par hi decode hoti hai, screen ke hisaab se chhoti karke. */
     suspend fun image(path: String): Bitmap? = withContext(container.dispatchers.io) {
-        try {
-            val bytes = zip?.open(path)?.use { it.readUpTo(MAX_IMAGE_BYTES) } ?: return@withContext null
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            var sample = 1
-            while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_IMAGE_SIDE) sample *= 2
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-        } catch (_: IOException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            null
-        }
+        zip?.decodeImage(path, MAX_IMAGE_SIDE)
     }
 
     override fun onCleared() {

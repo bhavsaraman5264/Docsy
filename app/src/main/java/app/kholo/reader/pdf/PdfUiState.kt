@@ -20,4 +20,6 @@ data class PdfUiState(
     val rotation: Int = 0,
     val search: PdfSearchState? = null,
     val showPageJump: Boolean = false,
+    val scrollerVisible: Boolean = false,
+    val scrubbing: Boolean = false,
 )

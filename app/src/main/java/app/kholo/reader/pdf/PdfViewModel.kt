@@ -20,6 +20,7 @@ private const val SEARCH_PAGE_CHUNK = 20
 private const val MAX_HITS = 500
 private const val FULL_TURN = 360
 private const val QUARTER_TURN = 90
+private const val SCROLLER_HIDE_MS = 2500L
 
 class PdfViewModel(
     private val document: PdfDocument,
@@ -32,11 +33,13 @@ class PdfViewModel(
     )
     val state: StateFlow<PdfUiState> = _state.asStateFlow()
     private var searchJob: Job? = null
+    private var scrollerJob: Job? = null
 
     fun onPageChanged(page: Int) {
         if (page != _state.value.page) {
             _state.update { it.copy(page = page) }
-            persist()
+            // Drag me saikdon page guzarte hain, isliye sirf aakhri page save hota hai.
+            if (!_state.value.scrubbing) persist()
         }
     }
 
@@ -48,6 +51,29 @@ class PdfViewModel(
 
     fun hideControls() {
         if (_state.value.search == null) _state.update { it.copy(controlsVisible = false) }
+    }
+
+    /** Haath se scroll karte hi fast scroll button dikhe, taaki lambi file me use dhoondhna na pade. */
+    fun onUserScroll() {
+        hideControls()
+        if (!_state.value.scrollerVisible) _state.update { it.copy(scrollerVisible = true) }
+        hideScrollerLater()
+    }
+
+    fun startScrub() = _state.update { it.copy(scrubbing = true) }
+
+    fun endScrub(page: Int) {
+        _state.update { it.copy(scrubbing = false, scrollerVisible = true, page = page) }
+        persist()
+        hideScrollerLater()
+    }
+
+    private fun hideScrollerLater() {
+        scrollerJob?.cancel()
+        scrollerJob = viewModelScope.launch {
+            delay(SCROLLER_HIDE_MS)
+            _state.update { it.copy(scrollerVisible = false) }
+        }
     }
 
     fun toggleNight() {

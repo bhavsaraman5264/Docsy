@@ -37,8 +37,11 @@ private data class TextProps(
 
 private class Run(var props: TextProps = TextProps(), var underline: Boolean = false)
 
-/** `word/document.xml` ko streaming me padh kar blocks banata hai. */
-class DocxParser(private val zip: SafeZip) {
+/**
+ * `word/document.xml` ko streaming me padh kar blocks banata hai. [forExport] par header, footer,
+ * footnote aur page number bhi padhe jate hain, jo PDF banane ke liye chahiye. Reader ko inki zaroorat nahi.
+ */
+class DocxParser(private val zip: SafeZip, private val forExport: Boolean = false) {
     private val rels = readRelationships(zip.open("word/_rels/document.xml.rels"), "word")
     private val styleNames = mutableMapOf<String, String>()
     private val styleProps = mutableMapOf<String, TextProps>()
@@ -46,6 +49,10 @@ class DocxParser(private val zip: SafeZip) {
     private val numbering: Map<String, List<Boolean>>
     private val counters = mutableMapOf<String, Int>()
     private var page = PageSetup()
+
+    /** Paragraph ke text ke baad aayi tasveerein. Paragraph judne ke baad hi block bante hain. */
+    private val afterParagraph = mutableListOf<DocBlock>()
+    private val noteIds = mutableListOf<String>()
 
     init {
         readStyles()
@@ -57,6 +64,8 @@ class DocxParser(private val zip: SafeZip) {
         val stream = zip.open("word/document.xml") ?: throw IOException("no document")
         val blocks = mutableListOf<DocBlock>()
         var nextUpdate = FIRST_UPDATE_BLOCKS
+        var headerPath: String? = null
+        var footerPath: String? = null
         stream.use { input ->
             val parser = safeXml(input)
             var depth = 0
@@ -66,6 +75,8 @@ class DocxParser(private val zip: SafeZip) {
             val cellText = StringBuilder()
             var cellRich = AnnotatedString.Builder()
             var cellFill: String? = null
+            var cellSpan = 1
+            var cellMerged = false
             var skippedNote = false
             parser.walk { event ->
                 if (event == XmlPullParser.START_TAG) {
@@ -83,13 +94,27 @@ class DocxParser(private val zip: SafeZip) {
                             cellText.clear()
                             cellRich = AnnotatedString.Builder()
                             cellFill = null
+                            cellSpan = 1
+                            cellMerged = false
                         }
                         "shd" -> if (depth == 1) cellFill = parser.attr("fill")?.takeIf { it != "auto" }
+                        "gridSpan" -> if (depth == 1) {
+                            cellSpan = (parser.attr("val")?.toIntOrNull() ?: 1).coerceIn(1, MAX_CELL_SPAN)
+                        }
+                        "vMerge" -> if (depth == 1) cellMerged = parser.attr("val") != "restart"
+                        "headerReference" -> if (isDefaultPart(parser) && headerPath == null) {
+                            headerPath = parser.attr("id")?.let(rels::get)
+                        }
+                        "footerReference" -> if (isDefaultPart(parser) && footerPath == null) {
+                            footerPath = parser.attr("id")?.let(rels::get)
+                        }
                         "p" -> {
                             val paragraph = readParagraph(parser, blocks)
                             when {
                                 depth == 0 -> if (paragraph != null) {
                                     blocks += paragraph
+                                    blocks += afterParagraph
+                                    afterParagraph.clear()
                                     if (blocks.size >= nextUpdate) {
                                         nextUpdate *= 2
                                         onProgress(ParsedDocument(blocks.toList(), page.sanitized()))
@@ -123,7 +148,13 @@ class DocxParser(private val zip: SafeZip) {
                 } else if (event == XmlPullParser.END_TAG) {
                     when (parser.name) {
                         "tc" -> if (depth == 1) {
-                            row += DocCell(cellText.toString(), cellRich.toAnnotatedString(), cellFill)
+                            row += DocCell(
+                                cellText.toString(),
+                                cellRich.toAnnotatedString(),
+                                cellFill,
+                                cellSpan,
+                                cellMerged,
+                            )
                         }
                         "tr" -> if (depth == 1) rows += row
                         "tbl" -> {
@@ -134,7 +165,63 @@ class DocxParser(private val zip: SafeZip) {
                 }
             }
         }
-        return ParsedDocument(blocks, page.sanitized())
+        blocks += afterParagraph
+        afterParagraph.clear()
+        return ParsedDocument(blocks, page.sanitized(), readPart(headerPath), readPart(footerPath), readNotes())
+    }
+
+    private fun isDefaultPart(parser: XmlPullParser): Boolean = forExport && parser.attr("type") == "default"
+
+    /** Header ya footer ki file. Inki tasveerein alag rels me hoti hain, isliye chhod dete hain. */
+    private fun readPart(path: String?): List<DocBlock.Paragraph> {
+        val stream = path?.let(zip::open) ?: return emptyList()
+        val paragraphs = mutableListOf<DocBlock.Paragraph>()
+        val ignored = mutableListOf<DocBlock>()
+        stream.use { input ->
+            val parser = safeXml(input)
+            parser.walk { event ->
+                if (event == XmlPullParser.START_TAG && parser.name == "p") {
+                    readParagraph(parser, ignored)?.let(paragraphs::add)
+                }
+            }
+        }
+        afterParagraph.clear()
+        return paragraphs
+    }
+
+    /** Footnote page ke neeche ki jagah document ke aakhir me aate hain, usi number ke saath. */
+    private fun readNotes(): List<DocBlock.Paragraph> {
+        if (noteIds.isEmpty()) return emptyList()
+        val stream = zip.open("word/footnotes.xml") ?: return emptyList()
+        val texts = mutableMapOf<String, MutableList<DocBlock.Paragraph>>()
+        val ignored = mutableListOf<DocBlock>()
+        var current: String? = null
+        stream.use { input ->
+            val parser = safeXml(input)
+            parser.walk { event ->
+                if (event == XmlPullParser.START_TAG) {
+                    when (parser.name) {
+                        "footnote" -> current = parser.attr("id")
+                        "p" -> {
+                            val paragraph = readParagraph(parser, ignored)
+                            val id = current
+                            if (paragraph != null && id != null) texts.getOrPut(id) { mutableListOf() } += paragraph
+                        }
+                    }
+                }
+            }
+        }
+        afterParagraph.clear()
+        return noteIds.flatMapIndexed { index, id ->
+            texts[id].orEmpty().mapIndexed { line, paragraph ->
+                if (line == 0) paragraph.numbered(index + 1) else paragraph
+            }
+        }
+    }
+
+    private fun DocBlock.Paragraph.numbered(number: Int): DocBlock.Paragraph {
+        val mark = AnnotatedString("[$number] ")
+        return copy(text = mark + text, rich = mark + rich)
     }
 
     private fun Float.ifZero(other: Float) = if (this > 0f) this else other
@@ -159,13 +246,32 @@ class DocxParser(private val zip: SafeZip) {
         var pageBreakBefore = false
     }
 
+    /** Word ka PAGE ya NUMPAGES field. File me iska purana nateeja likha hota hai, jo hamare kaam ka nahi. */
+    private class FieldState {
+        var inInstruction = false
+        var mark: Char? = null
+        var skipping = false
+    }
+
+    private fun fieldMark(instruction: String?): Char? =
+        when (instruction.orEmpty().trim().substringBefore(' ').uppercase()) {
+            "PAGE" -> PAGE_NUMBER_MARK
+            "NUMPAGES" -> PAGE_TOTAL_MARK
+            else -> null
+        }
+
     /** `<w:p>` ke END tak padhta hai. Tasveerein aur page break [blocks] me seedhe jate hain. */
     @Suppress("CyclomaticComplexMethod")
     private fun readParagraph(parser: XmlPullParser, blocks: MutableList<DocBlock>): DocBlock.Paragraph? {
         val plain = AnnotatedString.Builder()
         val rich = AnnotatedString.Builder()
         val state = ParagraphState()
+        val field = FieldState()
         var run = Run()
+        val emit = { text: String ->
+            plain.append(text, run)
+            rich.appendRich(text, run, state.styleId)
+        }
         var depth = 1
         var inRunProps = false
         var inParagraphProps = false
@@ -196,6 +302,31 @@ class DocxParser(private val zip: SafeZip) {
                         "sz" -> if (inRunProps) run.props = run.props.copy(size = halfPoints(parser.attr("val")))
                         "color" -> if (inRunProps) run.props = run.props.copy(color = parser.attr("val"))
                         "t" -> inText = true
+                        "footnoteReference" -> if (forExport) {
+                            parser.attr("id")?.let { noteIds += it }
+                            emit("[${noteIds.size}]")
+                        }
+                        "instrText" -> field.inInstruction = forExport
+                        "fldSimple" -> if (forExport) {
+                            fieldMark(parser.attr("instr"))?.let {
+                                emit(it.toString())
+                                field.skipping = true
+                            }
+                        }
+                        "fldChar" -> if (forExport) {
+                            val mark = field.mark
+                            when (parser.attr("fldCharType")) {
+                                "separate" -> if (mark != null) {
+                                    emit(mark.toString())
+                                    field.skipping = true
+                                }
+                                "end" -> {
+                                    if (mark != null && !field.skipping) emit(mark.toString())
+                                    field.mark = null
+                                    field.skipping = false
+                                }
+                            }
+                        }
                         "tab" -> if (!inParagraphProps) {
                             plain.append('\t')
                             rich.append('\t')
@@ -209,14 +340,14 @@ class DocxParser(private val zip: SafeZip) {
                         "lastRenderedPageBreak" -> state.pageBreakBefore = true
                         "extent" -> state.imageWidth = number(parser.attr("cx")).coerceAtLeast(0f) / EMU_PER_POINT
                         "blip" -> parser.attr("embed")?.let(rels::get)?.let {
-                            blocks +=
-                                DocBlock.Image(it, state.imageWidth)
+                            val image = DocBlock.Image(it, state.imageWidth)
+                            if (forExport && plain.length > 0) afterParagraph += image else blocks += image
                         }
                     }
                 }
-                XmlPullParser.TEXT -> if (inText) {
-                    plain.append(parser.text, run)
-                    rich.appendRich(parser.text, run, state.styleId)
+                XmlPullParser.TEXT -> when {
+                    field.inInstruction -> field.mark = fieldMark(parser.text) ?: field.mark
+                    inText && !field.skipping -> emit(parser.text)
                 }
                 XmlPullParser.END_TAG -> {
                     depth--
@@ -224,12 +355,15 @@ class DocxParser(private val zip: SafeZip) {
                         "pPr" -> inParagraphProps = false
                         "rPr" -> inRunProps = false
                         "t" -> inText = false
+                        "instrText" -> field.inInstruction = false
+                        "fldSimple" -> field.skipping = false
                     }
                 }
                 XmlPullParser.END_DOCUMENT -> depth = 0
             }
         }
-        if (state.pageBreakBefore) blocks += DocBlock.PageBreak
+        // Yeh Word ka pichhla page hisaab hai. PDF me hum khud page banate hain.
+        if (state.pageBreakBefore && !forExport) blocks += DocBlock.PageBreak
         val text = plain.toAnnotatedString()
         if (text.isEmpty()) return null
         return DocBlock.Paragraph(
@@ -360,6 +494,7 @@ class DocxParser(private val zip: SafeZip) {
 
     private companion object {
         const val HEADING_LEVELS = 6
+        const val MAX_CELL_SPAN = 63
     }
 }
 

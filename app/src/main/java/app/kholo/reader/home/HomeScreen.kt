@@ -6,16 +6,12 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -52,7 +48,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -71,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kholo.reader.R
 import app.kholo.reader.recents.RecentFile
+import app.kholo.reader.tools.ToolGrid
 import app.kholo.reader.tools.ToolKind
 import app.kholo.reader.ui.adaptive.rememberWindowInfo
 import app.kholo.reader.ui.components.AppTopBar
@@ -88,11 +84,14 @@ private val HOME_BAR_HEIGHT = 48.dp
 /** Aakhri file `Open file` button ke neeche na chhupe. */
 private val LIST_BOTTOM_PADDING = 96.dp
 
-/** Screen ke left ke itne hisse se shuru hua swipe menu kholta hai. Beech aur right ka swipe nahi. */
-private const val DRAWER_START_SHARE = 0.35f
+/** Screen ke left se beech tak kahin se shuru hua swipe menu kholta hai. Bilkul right wala nahi. */
+private const val DRAWER_START_SHARE = 0.7f
 
 /** Itna khinchne par menu khule, taaki halki si ungli se na khul jaye. */
 private val DRAWER_PULL = 48.dp
+
+/** Itni tez chhoti flick bhi menu khole, chahe [DRAWER_PULL] tak na pahunchi ho. Dp prati second. */
+private val DRAWER_FLICK = 600.dp
 
 /** Page ka itna hissa khinchne par tab badle. Default aadha hai, jo bhaari lagta hai. */
 private const val TAB_SWITCH_THRESHOLD = 0.3f
@@ -120,7 +119,10 @@ fun HomeScreen(
     val favoriteList = rememberLazyListState()
     LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { viewModel.lastPage = it } }
     val pullPx = with(LocalDensity.current) { DRAWER_PULL.toPx() }
-    val drawerPull = remember(drawer, pullPx) { DrawerPull(pullPx) { scope.launch { drawer.open() } } }
+    val flickPx = with(LocalDensity.current) { DRAWER_FLICK.toPx() }
+    val drawerPull = remember(drawer, pullPx, flickPx) {
+        DrawerPull(pullPx, flickPx) { scope.launch { drawer.open() } }
+    }
     // Sirf button ke andar padha jata hai, taaki swipe ke beech poori screen dobara na bane.
     val hasFiles by remember(state.recents, state.favorites) {
         derivedStateOf {
@@ -172,7 +174,7 @@ fun HomeScreen(
                         .pointerInput(drawerPull) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                drawerPull.fromEdge = down.position.x <= size.width * DRAWER_START_SHARE
+                                drawerPull.begin(down.position.x <= size.width * DRAWER_START_SHARE)
                             }
                         }
                         .nestedScroll(drawerPull),
@@ -185,7 +187,7 @@ fun HomeScreen(
                     ),
                 ) { page ->
                     when (val shown = HomeTab.entries[page]) {
-                        HomeTab.Tools -> ToolList(onTool)
+                        HomeTab.Tools -> ToolGrid(onTool)
                         HomeTab.Recent -> FilePage(shown, state.recents, recentList, onPickFile) {
                             RecentRow(it, onOpen, onShare, viewModel)
                         }
@@ -239,55 +241,39 @@ private fun FilePage(
     }
 }
 
-@Composable
-private fun ToolList(onTool: (ToolKind) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize()) {
-        items(ToolKind.entries) { tool ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onTool(tool) }
-                    .padding(horizontal = Spacing.screenPadding, vertical = Spacing.m),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.l),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    painterResource(tool.icon),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(tool.title), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        stringResource(tool.hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
 /** Pehle tab par pager aur peeche nahi ja sakta. Kinare se shuru hua bacha hua right swipe menu kholta hai. */
-private class DrawerPull(private val threshold: Float, private val open: () -> Unit) : NestedScrollConnection {
+private class DrawerPull(
+    private val threshold: Float,
+    private val flick: Float,
+    private val open: () -> Unit,
+) : NestedScrollConnection {
     private var pulled = 0f
-    var fromEdge = false
+    private var canOpen = false
+
+    fun begin(inZone: Boolean) {
+        canOpen = inZone
+        pulled = 0f
+    }
 
     override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-        if (source == NestedScrollSource.UserInput && fromEdge) {
+        if (source == NestedScrollSource.UserInput && canOpen) {
             pulled = if (available.x > 0f) pulled + available.x else 0f
-            if (pulled >= threshold) {
-                pulled = 0f
-                open()
-            }
+            if (pulled >= threshold) openOnce()
         }
         return Offset.Zero
     }
 
     override suspend fun onPreFling(available: Velocity): Velocity {
+        // Pager jo khinchav nahi le paya wahi pulled hai, isliye tab badalne wali flick menu nahi kholti.
+        if (canOpen && pulled > 0f && available.x >= flick) openOnce()
         pulled = 0f
         return Velocity.Zero
+    }
+
+    /** Ek swipe mein ek hi baar, warna chalti animation dobara shuru hokar jhatka deti hai. */
+    private fun openOnce() {
+        canOpen = false
+        open()
     }
 }
 

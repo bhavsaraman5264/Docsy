@@ -10,8 +10,8 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        // Placeholder: pehle Play upload se pehle final hoga, uske baad badal nahi sakta.
-        applicationId = "app.kholo.reader"
+        // Play par pehle upload ke baad yeh kabhi nahi badal sakta. Code ka namespace alag hai aur purana hi rahega.
+        applicationId = "app.docsy.reader"
         minSdk = 28
         targetSdk = 36
         versionCode = 1
@@ -101,11 +101,14 @@ dependencies {
     implementation(libs.pdfbox.android)
 
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
     testImplementation("org.json:json:20250517")
     testImplementation(libs.coroutines.test)
 
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test)
     androidTestImplementation(libs.test.runner)
     androidTestImplementation(libs.test.uiautomator)
     androidTestImplementation(libs.test.ext.junit)

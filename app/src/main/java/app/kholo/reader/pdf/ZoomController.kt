@@ -69,6 +69,8 @@ class ZoomController(
     }
 
     private suspend fun open() {
+        // Library document set hone par ise wapas chalu kar deti hai. Hamara PageScroller iski jagah hai.
+        view.fastScrollVisibility = PdfView.FastScrollVisibility.ALWAYS_HIDE
         if (widths[startPage] == 0) widths[startPage] = document.getPageInfo(startPage).width
         widest = maxOf(widest, widths[startPage])
         applyLimits()
@@ -115,6 +117,21 @@ class ZoomController(
         keepOnScreen(anchor)
         alignPage(page)
     }
+
+    /**
+     * Page ka upar wala kinara screen ke upar laata hai, zoom wahi rehta hai.
+     * `scrollToPage` nahi, kyunki wo zoom badal deta hai aur page ko screen ke beech rakhta hai.
+     * `scrollToPosition` diye gaye point ko screen ke beech lata hai, isliye aadhi screen neeche ka point dete hain.
+     */
+    fun jumpTo(page: Int) {
+        if (!opened) return
+        val pageWidth = widths.getOrElse(page) { 0 }.ifZero(widest)
+        val viewportHeight = view.height - view.paddingTop
+        view.scrollToPosition(PdfPoint(page, pageWidth / 2f, viewportHeight / 2f / view.zoom))
+    }
+
+    /** Drag khatam: wahi hisaab jo haath se scroll khatam hone par hota hai. */
+    fun endJump() = settle()
 
     private fun centerPoint(): PdfPoint? = view.viewToPdfPoint(view.width / 2f, view.height / 2f)
 

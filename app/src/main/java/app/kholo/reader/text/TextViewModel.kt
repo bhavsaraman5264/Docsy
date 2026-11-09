@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.LoadState
+import app.kholo.reader.core.PageStamps
 import app.kholo.reader.core.file.readUpTo
 import app.kholo.reader.core.file.toAppError
 import app.kholo.reader.viewer.FindController
@@ -65,8 +66,7 @@ class TextViewModel(private val uri: Uri, private val container: AppContainer) :
     private val _state = MutableStateFlow<LoadState<TextPager>>(LoadState.Loading)
     val state: StateFlow<LoadState<TextPager>> = _state.asStateFlow()
 
-    private val _version = MutableStateFlow(0)
-    val version: StateFlow<Int> = _version.asStateFlow()
+    private val stamps = PageStamps()
 
     private val chunks = LruCache<Int, String>(CACHED_CHUNKS)
     private val loading = mutableSetOf<Int>()
@@ -144,6 +144,9 @@ class TextViewModel(private val uri: Uri, private val container: AppContainer) :
         }
     }
 
+    /** Tukde ka nishan: composition me padho. Sirf iska text aane par badalta hai. */
+    fun stamp(index: Int): Int = stamps.read(index)
+
     fun chunk(index: Int): String? {
         val cached = chunks.get(index)
         if (cached == null) load(index)
@@ -163,7 +166,7 @@ class TextViewModel(private val uri: Uri, private val container: AppContainer) :
             }
             loading.remove(index)
             chunks.put(index, text)
-            _version.value++
+            stamps.bump(index)
         }
     }
 

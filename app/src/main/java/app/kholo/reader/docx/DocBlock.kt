@@ -41,7 +41,14 @@ data class PageSetup(
     }
 }
 
-class DocCell(val text: String, val rich: AnnotatedString, val fill: String?)
+/** [span] Word ka `gridSpan` hai. [mergedUp] matlab yeh cell upar wale cell ka hi hissa hai (`vMerge`). */
+class DocCell(
+    val text: String,
+    val rich: AnnotatedString,
+    val fill: String?,
+    val span: Int = 1,
+    val mergedUp: Boolean = false,
+)
 
 /** DOCX aur PPTX ke blocks. `rich` me Word ke asli size aur rang hain, jo page view use karta hai. */
 sealed interface DocBlock {
@@ -68,4 +75,15 @@ sealed interface DocBlock {
     data object Skipped : DocBlock
 }
 
-class ParsedDocument(val blocks: List<DocBlock>, val page: PageSetup = PageSetup())
+/** Header ya footer ke text me page number ki jagah. Asli number page banate waqt lagta hai. */
+const val PAGE_NUMBER_MARK = '\uE000'
+const val PAGE_TOTAL_MARK = '\uE001'
+
+/** [header], [footer] aur [notes] sirf PDF banate waqt bharte hain. Reader unhe nahi dikhata. */
+class ParsedDocument(
+    val blocks: List<DocBlock>,
+    val page: PageSetup = PageSetup(),
+    val header: List<DocBlock.Paragraph> = emptyList(),
+    val footer: List<DocBlock.Paragraph> = emptyList(),
+    val notes: List<DocBlock.Paragraph> = emptyList(),
+)

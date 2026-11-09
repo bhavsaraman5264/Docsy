@@ -60,7 +60,6 @@ fun TextScreen(uri: Uri, name: String, container: AppContainer, actions: ReaderA
         factory = viewModelFactory { initializer { TextViewModel(uri, container) } },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val version by viewModel.version.collectAsStateWithLifecycle()
     var fontSize by rememberSaveable { mutableIntStateOf(DEFAULT_FONT_SP) }
     val findState by viewModel.find.state.collectAsStateWithLifecycle()
     val hit = findState.currentHit
@@ -91,7 +90,8 @@ fun TextScreen(uri: Uri, name: String, container: AppContainer, actions: ReaderA
                     contentPadding = PaddingValues(Spacing.screenPadding),
                 ) {
                     items(current.value.chunkCount) { index ->
-                        val text = remember(index, version) { viewModel.chunk(index) }
+                        val stamp = viewModel.stamp(index)
+                        val text = remember(index, stamp) { viewModel.chunk(index) }
                         if (text == null) {
                             Box(Modifier.fillMaxWidth().height(PLACEHOLDER_HEIGHT))
                         } else {

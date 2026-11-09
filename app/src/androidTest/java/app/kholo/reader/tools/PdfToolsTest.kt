@@ -82,7 +82,21 @@ class PdfToolsTest {
     }
 
     @Test
-    fun splitKeepsTheChosenRange() {
+    fun splitMakesTwoFilesAndLosesNoPage() {
+        val first = out("part-1.pdf")
+        val second = out("part-2.pdf")
+        val parts = checkNotNull(splitParts(500, 200)).map(IntRange::toList)
+        tools.split(asset("long-500-pages.pdf"), parts, listOf(first, second))
+        assertEquals(200, pages(first))
+        assertEquals(300, pages(second))
+        assertTrue(text(first).contains("page 200"))
+        assertFalse(text(first).contains("page 201"))
+        assertTrue(text(second).contains("page 201"))
+        assertTrue(text(second).contains("page 500"))
+    }
+
+    @Test
+    fun extractKeepsTheChosenRange() {
         val result = out("split.pdf")
         tools.rearrange(asset("long-500-pages.pdf"), (99 until 110).toList(), result)
         assertEquals(11, pages(result))
@@ -131,8 +145,13 @@ class PdfToolsTest {
     @Test
     fun unlockRemovesThePassword() {
         val result = out("open.pdf")
-        tools.unlock(asset("Aadhaar_fake_ASHA1990.pdf"), "ASHA1990", result)
+        assertTrue(tools.unlock(asset("Aadhaar_fake_ASHA1990.pdf"), "ASHA1990", result))
         assertTrue(text(result).contains("Fake Aadhaar"))
+    }
+
+    @Test
+    fun unlockSaysWhenThereWasNoPassword() {
+        assertFalse(tools.unlock(asset("simple.pdf"), "anything", out("same.pdf")))
     }
 
     @Test

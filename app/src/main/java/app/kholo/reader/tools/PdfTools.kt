@@ -2,9 +2,8 @@ package app.kholo.reader.tools
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
-import android.media.ExifInterface
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import androidx.core.graphics.scale
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.cos.COSBase
@@ -20,18 +19,16 @@ import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 
 private const val MAIN_MEMORY_BYTES = 24L * 1024 * 1024
-private const val MAX_PHOTO_SIDE = 2200
-private const val PHOTO_QUALITY = 0.82f
+private const val PHOTO_QUALITY = 82
+private const val PHOTO_WORKERS = 3
 private const val KEY_LENGTH = 256
 private const val MIN_IMAGE_PIXELS = 10_000L
-private const val FULL_TURN = 360
-private const val QUARTER_TURN = 90
-private const val HALF_TURN = 180
 
 /** PDF readers isse lamba page theek se nahi dikhate. */
 private const val MAX_PAGE_POINTS = 14_400f
@@ -46,7 +43,17 @@ private val COMPRESS_STEPS = listOf(
     0.3f to 0.25f,
 )
 
-class CompressResult(val reachedTarget: Boolean, val hadImages: Boolean)
+/** Binary search me [COMPRESS_STEPS] par itni koshish se zyada nahi lagti. Sirf progress ke liye. */
+private const val MAX_COMPRESS_PASSES = 3
+
+/** Kaam kitna hua: `done` me se `total`. Cancel bhi yahin se phenka jata hai. */
+typealias ToolProgress = (done: Int, total: Int) -> Unit
+
+private val NO_PROGRESS: ToolProgress = { _, _ -> }
+
+class CompressResult(val reachedTarget: Boolean, val hadImages: Boolean, val alreadySmall: Boolean = false)
+
+private class EncodedPhoto(val jpeg: ByteArray, val width: Int, val height: Int)
 
 /** PDF banane wale ne yeh badlav mana kiya hai. Password yahan khali hota hai, isliye file khul jati hai. */
 class PdfRestricted : IOException()
@@ -64,12 +71,22 @@ class PdfTools(context: Context, private val scratchDir: File) {
         return MemoryUsageSetting.setupMixed(MAIN_MEMORY_BYTES).setTempDir(scratchDir)
     }
 
-    /** Bada PDF RAM me nahi aata: 24 MB ke baad temp file use hoti hai. */
-    private fun open(file: File, password: String = ""): PDDocument {
+    private fun ensureReady() {
         if (!ready) {
             PDFBoxResourceLoader.init(appContext)
             ready = true
         }
+    }
+
+    /** User file chun raha hota hai tab tak PDFBox ki classes load ho jati hain, pehla kaam atakta nahi. */
+    fun warmUp() {
+        ensureReady()
+        PDDocument().close()
+    }
+
+    /** Bada PDF RAM me nahi aata: 24 MB ke baad temp file use hoti hai. */
+    private fun open(file: File, password: String = ""): PDDocument {
+        ensureReady()
         return PDDocument.load(file, password, memory())
     }
 
@@ -83,15 +100,32 @@ class PdfTools(context: Context, private val scratchDir: File) {
         isAllSecurityToBeRemoved = true
     }
 
-    fun pageCount(file: File): Int = open(file).use { doc ->
+    /** Convert tools ke liye: PDF khul kar kaam hote hi band ho jati hai. */
+    fun <T> read(file: File, block: (PDDocument) -> T): T = open(file).use(block)
+
+    /** Native renderer PDFBox se kai guna tez hai. Password ya kharab file ki saaf galti PDFBox hi batata hai. */
+    fun pageCount(file: File): Int = quickPageCount(file) ?: open(file).use { doc ->
         doc.numberOfPages.also { if (it <= 0) throw PdfHasNoPages() }
     }
 
-    fun merge(files: List<File>, out: File) {
+    private fun quickPageCount(file: File): Int? = try {
+        PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { pdf ->
+            pdf.pageCount.takeIf { it > 0 }
+        }
+    } catch (_: IOException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
+    fun merge(files: List<File>, out: File, progress: ToolProgress = NO_PROGRESS) {
         val merger = PDFMergerUtility()
         open(files.first()).use { target ->
             target.allow(AccessPermission::canAssembleDocument)
-            files.drop(1).forEach { file ->
+            files.drop(1).forEachIndexed { index, file ->
+                progress(index + 1, files.size)
                 open(file).use { source ->
                     source.allow(AccessPermission::canAssembleDocument)
                     merger.appendDocument(target, source)
@@ -101,44 +135,64 @@ class PdfTools(context: Context, private val scratchDir: File) {
         }
     }
 
-    /** Jodna nahi, chunna: split, reorder aur page hatana teeno yahi hai. [order] me 0-based pages. */
-    fun rearrange(file: File, order: List<Int>, out: File) {
+    /** Jodna nahi, chunna: page nikalna, reorder aur hatana. [order] me 0-based pages, [turns] me degree. */
+    fun rearrange(file: File, order: List<Int>, out: File, turns: Map<Int, Int> = emptyMap()) {
         open(file).use { source ->
             source.allow(AccessPermission::canAssembleDocument)
-            PDDocument(memory()).use { result ->
-                order.forEach { index -> result.importPage(source.getPage(index)) }
-                result.save(out)
+            writePages(source, order, out, turns)
+        }
+    }
+
+    /** Ek PDF ke kai hisse. Asli file ek hi baar khulti hai, har hissa [outs] me apni file banta hai. */
+    fun split(file: File, parts: List<List<Int>>, outs: List<File>, progress: ToolProgress = NO_PROGRESS) {
+        open(file).use { source ->
+            source.allow(AccessPermission::canAssembleDocument)
+            parts.forEachIndexed { index, pages ->
+                progress(index, parts.size)
+                writePages(source, pages, outs[index])
             }
         }
     }
 
-    fun photosToPdf(photos: List<() -> InputStream?>, out: File) {
-        if (!ready) open(emptyPdf()).close()
+    private fun writePages(source: PDDocument, order: List<Int>, out: File, turns: Map<Int, Int> = emptyMap()) {
+        PDDocument(memory()).use { result ->
+            order.forEach { index ->
+                val page = result.importPage(source.getPage(index))
+                turns[index]?.let { page.rotation = (page.rotation + it) % FULL_TURN }
+            }
+            result.save(out)
+        }
+    }
+
+    /** Photo padhna aur JPEG banana sabse bhaari hai, isliye woh saath chalta hai. PDF me jodna kram se. */
+    fun photosToPdf(
+        photos: List<() -> InputStream?>,
+        out: File,
+        progress: ToolProgress = NO_PROGRESS,
+        workers: Int = PHOTO_WORKERS,
+    ) {
+        ensureReady()
         PDDocument(memory()).use { doc ->
-            photos.forEach { source ->
-                val bitmap = loadPhoto(source) ?: throw IOException("unreadable photo")
-                val image = JPEGFactory.createFromImage(doc, bitmap, PHOTO_QUALITY)
-                val box = fitPage(bitmap.width, bitmap.height)
+            pipeline(photos, workers, ::encodePhoto) { index, photo ->
+                val image = JPEGFactory.createFromByteArray(doc, photo.jpeg)
+                val box = fitPage(photo.width, photo.height)
                 val page = PDPage(box)
                 doc.addPage(page)
                 PDPageContentStream(doc, page).use { it.drawImage(image, 0f, 0f, box.width, box.height) }
-                bitmap.recycle()
+                progress(index + 1, photos.size)
             }
             doc.save(out)
         }
     }
 
-    private fun emptyPdf(): File {
-        val file = File(scratchDir.apply { mkdirs() }, "init.pdf")
-        if (!ready) {
-            PDFBoxResourceLoader.init(appContext)
-            ready = true
-        }
-        PDDocument().use {
-            it.addPage(PDPage())
-            it.save(file)
-        }
-        return file
+    private fun encodePhoto(source: () -> InputStream?): EncodedPhoto {
+        val decoded = loadPhoto(source) ?: throw IOException("unreadable photo")
+        val photo = decoded.flattened()
+        val jpeg = ByteArrayOutputStream().also { photo.compress(Bitmap.CompressFormat.JPEG, PHOTO_QUALITY, it) }
+        val encoded = EncodedPhoto(jpeg.toByteArray(), photo.width, photo.height)
+        if (photo !== decoded) decoded.recycle()
+        photo.recycle()
+        return encoded
     }
 
     /** Photo ko A4 ki chaudai par laate hain, taaki PDF print par sahi aaye. Bahut lambi photo chhoti hoti hai. */
@@ -149,49 +203,48 @@ class PdfTools(context: Context, private val scratchDir: File) {
         return PDRectangle(pageWidth * shrink, pageHeight * shrink)
     }
 
-    private fun loadPhoto(source: () -> InputStream?): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        source()?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_PHOTO_SIDE) sample *= 2
-        val decoded = source()?.use {
-            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+    /**
+     * Tasveerein chhoti karta hai, text jaisa tha waisa rehta hai. Target na mile to sabse chhoti file deta hai.
+     * Har koshish poori file dobara likhti hai, isliye koshish kam se kam rakhi hain: dekho [searchSteps].
+     */
+    fun compress(file: File, targetBytes: Long, out: File, progress: ToolProgress = NO_PROGRESS): CompressResult {
+        if (targetBytes > 0L && file.length() <= targetBytes) {
+            file.copyTo(out, overwrite = true)
+            return CompressResult(reachedTarget = true, hadImages = true, alreadySmall = true)
         }
-        val degrees = source()?.use { exifRotation(it) } ?: 0
-        return if (decoded == null || degrees == 0) {
-            decoded
-        } else {
-            val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
-            Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
-        }
-    }
-
-    private fun exifRotation(stream: InputStream): Int =
-        when (ExifInterface(stream).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> QUARTER_TURN
-            ExifInterface.ORIENTATION_ROTATE_180 -> HALF_TURN
-            ExifInterface.ORIENTATION_ROTATE_270 -> FULL_TURN - QUARTER_TURN
-            else -> 0
-        }
-
-    /** Tasveerein chhoti karta hai, text jaisa tha waisa rehta hai. Target na mile to sabse chhoti file deta hai. */
-    fun compress(file: File, targetBytes: Long, out: File): CompressResult {
         var hadImages = false
         var best = Long.MAX_VALUE
+        var bestFits = false
+        var pass = 0
+        val passes = if (targetBytes > 0L) MAX_COMPRESS_PASSES else 1
         val attempt = File(scratchDir.apply { mkdirs() }, "attempt.pdf")
-        for ((scale, quality) in COMPRESS_STEPS) {
-            open(file).use { doc ->
-                doc.allow(AccessPermission::canModify)
-                hadImages = recompressImages(doc, scale, quality) || hadImages
-                doc.save(attempt)
+        try {
+            searchSteps(COMPRESS_STEPS.size, smallestOnly = targetBytes <= 0L) { index ->
+                val (scale, quality) = COMPRESS_STEPS[index]
+                open(file).use { doc ->
+                    doc.allow(AccessPermission::canModify)
+                    val changed = recompressImages(doc, scale, quality) { done, pages ->
+                        progress(pass * pages + done, passes * pages)
+                    }
+                    hadImages = changed || hadImages
+                    doc.save(attempt)
+                }
+                pass++
+                val fits = attempt.length() <= targetBytes
+                if (fits || (!bestFits && attempt.length() < best)) {
+                    best = attempt.length()
+                    bestFits = fits
+                    attempt.copyTo(out, overwrite = true)
+                }
+                when {
+                    !hadImages -> StepOutcome.Stop
+                    fits -> StepOutcome.Fits
+                    else -> StepOutcome.TooBig
+                }
             }
-            if (attempt.length() < best) {
-                best = attempt.length()
-                attempt.copyTo(out, overwrite = true)
-            }
-            if (best <= targetBytes || !hadImages) break
+        } finally {
+            attempt.delete()
         }
-        attempt.delete()
         // Pehle se chhoti file dobara likhne par badi ho sakti hai. Tab asli hi behtar hai.
         if (best >= file.length()) {
             file.copyTo(out, overwrite = true)
@@ -200,12 +253,14 @@ class PdfTools(context: Context, private val scratchDir: File) {
         return CompressResult(best <= targetBytes, hadImages)
     }
 
-    private fun recompressImages(doc: PDDocument, scale: Float, quality: Float): Boolean {
+    private fun recompressImages(doc: PDDocument, scale: Float, quality: Float, progress: ToolProgress): Boolean {
         val done = HashMap<COSBase, PDImageXObject>()
         val made = HashSet<COSBase>()
         var changed = false
-        for (page in doc.pages) {
-            val resources = page.resources ?: continue
+        val pages = doc.numberOfPages
+        doc.pages.forEachIndexed { index, page ->
+            progress(index, pages)
+            val resources = page.resources ?: return@forEachIndexed
             for (name in resources.xObjectNames.toList()) {
                 val image = resources.getXObject(name) as? PDImageXObject ?: continue
                 if (image.cosObject in made || !canReencode(image)) continue
@@ -254,19 +309,25 @@ class PdfTools(context: Context, private val scratchDir: File) {
         }
     }
 
-    /** Sirf tab chalta hai jab user ko password pata ho. */
-    fun unlock(file: File, password: String, out: File) {
-        open(file, password).use { doc ->
-            doc.isAllSecurityToBeRemoved = true
-            doc.save(out)
-        }
+    /** Sirf tab chalta hai jab user ko password pata ho. False ka matlab file par password tha hi nahi. */
+    fun unlock(file: File, password: String, out: File): Boolean = open(file, password).use { doc ->
+        val locked = doc.isEncrypted
+        doc.isAllSecurityToBeRemoved = true
+        doc.save(out)
+        locked
     }
 
     /** Scan wali PDF me text hota hi nahi. False ka matlab user ko batana hai, khaali file chup-chaap nahi deni. */
-    fun extractText(file: File, out: File): Boolean {
+    fun extractText(file: File, out: File, progress: ToolProgress = NO_PROGRESS): Boolean {
         open(file).use { doc ->
             if (doc.isEncrypted && !doc.currentAccessPermission.canExtractContent()) throw PdfRestricted()
-            out.writer(Charsets.UTF_8).use { PDFTextStripper().writeText(doc, it) }
+            val stripper = object : PDFTextStripper() {
+                override fun endPage(page: PDPage) {
+                    super.endPage(page)
+                    progress(currentPageNo, doc.numberOfPages)
+                }
+            }
+            out.writer(Charsets.UTF_8).use { stripper.writeText(doc, it) }
         }
         return out.useLines { lines -> lines.any(String::isNotBlank) }
     }

@@ -1,0 +1,7 @@
+# App ka apna code aur PDF viewer library pehle se compile ho, taaki install ke baad pehli baar
+# kholna aur pehla scroll JIT ki wajah se na atke. Compose aur baaki libraries apna profile khud laati hain.
+# PDFBox jaan-boojh kar bahar hai: woh bahut bada hai aur sirf tools me chalta hai.
+HSPLapp/kholo/reader/**->**(**)**
+Lapp/kholo/reader/**;
+HSPLandroidx/pdf/**->**(**)**
+Landroidx/pdf/**;

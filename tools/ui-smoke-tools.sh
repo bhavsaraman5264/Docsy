@@ -10,7 +10,7 @@ txt(){ dump | grep -oE 'text="[^"]+"' | head -"${1:-5}" | tr '\n' ' '; echo; }
 shot(){ "$ADB" -s $E shell "sleep ${2:-1}; screencap -p /sdcard/s.png"; "$ADB" -s $E pull /sdcard/s.png "$OUT/$1.png" >/dev/null 2>&1; }
 w(){ "$ADB" -s $E shell sleep "${1:-3}"; }
 fresh(){ "$ADB" -s $E shell "touch /sdcard/Download/$1; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/$1 >/dev/null; sleep 2"; }
-tool(){ "$ADB" -s $E shell am force-stop app.kholo.reader; "$ADB" -s $E shell am start -n app.kholo.reader/.MainActivity >/dev/null; w 4; tapt "Tools"; w 2; tapt "$1"; w 4; }
+tool(){ "$ADB" -s $E shell am force-stop app.docsy.reader; "$ADB" -s $E shell am start -n app.docsy.reader/app.kholo.reader.MainActivity >/dev/null; w 4; tapt "Tools"; w 2; tapt "$1"; w 4; }
 
 echo "== add password"
 fresh simple.pdf; tool "Add password"; tapt "simple.pdf"; w 5

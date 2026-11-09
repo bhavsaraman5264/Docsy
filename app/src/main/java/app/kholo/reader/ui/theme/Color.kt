@@ -23,7 +23,7 @@ private val Crema = Color(0xFFD7B899)
 private val Steam = Color(0xFFF2E6D9)
 private val DeepRoast = Color(0xFF2B1A12)
 
-/** Coffee wali halki theme: latte kagaz, espresso syahi. Tez rang sirf file type ke liye bachaya hai. */
+/** Coffee wali halki theme: latte kagaz, espresso syahi. Tez rang sirf file type aur tools ke liye hai. */
 val LightColors = lightColorScheme(
     primary = Coffee,
     onPrimary = Foam,
@@ -41,6 +41,7 @@ val LightColors = lightColorScheme(
     surfaceVariant = Oat,
     onSurfaceVariant = Mocha,
     surfaceTint = Latte,
+    surfaceBright = Foam,
     surfaceContainerLowest = Latte,
     surfaceContainerLow = Latte,
     surfaceContainer = Biscuit,
@@ -69,6 +70,7 @@ val DarkColors = darkColorScheme(
     surfaceVariant = Grounds,
     onSurfaceVariant = Caramel,
     surfaceTint = Bean,
+    surfaceBright = Grounds,
     surfaceContainerLowest = Roast,
     surfaceContainerLow = Bean,
     surfaceContainer = Grounds,
@@ -95,5 +97,16 @@ fun fileTypeColor(label: String, dark: Boolean): Color = when (label) {
     "DOC" -> if (dark) Color(0xFF8AB4F8) else Color(0xFF1A5FB4)
     "XLS" -> if (dark) Color(0xFF81C995) else Color(0xFF1B7F3B)
     "PPT" -> if (dark) Color(0xFFFDB57A) else Color(0xFFB95000)
+    "JPG" -> if (dark) Color(0xFFD7AEFB) else Color(0xFF7B3F8C)
     else -> if (dark) Caramel else Mocha
+}
+
+/** Tools tab ke icon ka rang, taaki grid me har tool door se pehchana jaye. */
+enum class ToolTone(val light: Color, val dark: Color) {
+    Red(Color(0xFFC62828), Color(0xFFFF8A80)),
+    Blue(Color(0xFF1A5FB4), Color(0xFF8AB4F8)),
+    Green(Color(0xFF1B7F3B), Color(0xFF81C995)),
+    Orange(Color(0xFFB95000), Color(0xFFFDB57A)),
+    Plum(Color(0xFF7B3F8C), Color(0xFFD7AEFB)),
+    Teal(Color(0xFF00796B), Color(0xFF80CBC4)),
 }

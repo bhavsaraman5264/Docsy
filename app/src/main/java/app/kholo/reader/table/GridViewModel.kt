@@ -2,12 +2,15 @@ package app.kholo.reader.table
 
 import android.database.sqlite.SQLiteException
 import android.net.Uri
-import android.util.LruCache
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.AppError
 import app.kholo.reader.core.LoadState
+import app.kholo.reader.core.PageStamps
 import app.kholo.reader.core.file.SafeZip
 import app.kholo.reader.core.file.readUpTo
 import app.kholo.reader.core.file.toAppError
@@ -55,13 +58,10 @@ class GridViewModel(
     private val _state = MutableStateFlow<LoadState<TableSource>>(LoadState.Loading)
     val state: StateFlow<LoadState<TableSource>> = _state.asStateFlow()
 
-    /** Har naye page par badhta hai, taaki dikhne wali rows dobara bane. */
-    private val _version = MutableStateFlow(0)
-    val version: StateFlow<Int> = _version.asStateFlow()
-
     private val io = CoroutineScope(SupervisorJob() + container.dispatchers.io)
-    private val pages = LruCache<Int, List<TableRow>>(CACHED_PAGES)
-    private val loading = mutableSetOf<Int>()
+    private val book = PageBook(CACHED_PAGES)
+    private val stamps = PageStamps()
+    private var sheetStamp by mutableIntStateOf(0)
     private var tempFile: File? = null
     private var source: TableSource? = null
 
@@ -163,9 +163,12 @@ class GridViewModel(
         return XlsxSqliteSource(zip, workbook, strings, styles, db, io)
     }
 
+    /** Row ka nishan: composition me padho. Sirf iske page ka data aane par badalta hai. */
+    fun stamp(index: Int): Long = (sheetStamp.toLong() shl Int.SIZE_BITS) or stamps.read(index / PAGE_ROWS).toLong()
+
     fun row(index: Int): TableRow? {
         val page = index / PAGE_ROWS
-        val rows = pages.get(page)
+        val rows = book[page]
         if (rows == null) {
             load(page)
             return null
@@ -176,7 +179,8 @@ class GridViewModel(
 
     private fun load(page: Int) {
         val table = source ?: return
-        if (pages.get(page) != null || !loading.add(page)) return
+        if (!book.startLoad(page)) return
+        val generation = book.generation
         io.launch {
             val rows = try {
                 table.rows(page * PAGE_ROWS, PAGE_ROWS)
@@ -188,25 +192,23 @@ class GridViewModel(
                 emptyList()
             }
             withContext(container.dispatchers.main) {
-                loading.remove(page)
-                if (rows.size == PAGE_ROWS || table.info.value.finished) pages.put(page, rows)
-                _version.value++
+                val complete = rows.size == PAGE_ROWS || table.info.value.finished
+                if (book.loaded(page, rows, complete, generation)) stamps.bump(page)
             }
         }
     }
 
-    /** Import chalte waqt adhoore pages dobara padhne hain. */
+    /** Import chalte waqt sirf adhoore pages dobara padhne hain. Poore pages wahi rehte hain. */
     fun refresh() {
-        pages.evictAll()
-        _version.value++
+        book.forgetPartial().forEach(stamps::bump)
     }
 
     fun selectSheet(index: Int) {
-        pages.evictAll()
         io.launch {
             source?.selectSheet(index)
             withContext(container.dispatchers.main) {
-                _version.value++
+                book.clear()
+                sheetStamp++
                 find.rescan()
             }
         }

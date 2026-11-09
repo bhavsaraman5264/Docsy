@@ -35,6 +35,7 @@
     <string name="favorites_empty_hint">Tap the star on any file</string>
     <string name="time_just_now">Just now</string>
     <string name="page_indicator">%1$d / %2$d</string>
+    <string name="page_scroller">Fast scroll through pages. Tap to go to a page</string>
     <string name="page_jump_title">Go to page</string>
     <string name="page_jump_hint">Page 1 to %1$d</string>
     <string name="search_count">%1$d of %2$d</string>
@@ -106,9 +107,9 @@
     <string name="tool_merge">Merge PDFs</string>
     <string name="tool_merge_hint">Join files into one</string>
     <string name="tool_split">Split PDF</string>
-    <string name="tool_split_hint">Keep a range of pages</string>
+    <string name="tool_split_hint">Cut a PDF into two files</string>
     <string name="tool_organize">Organize pages</string>
-    <string name="tool_organize_hint">Reorder or remove pages</string>
+    <string name="tool_organize_hint">Reorder, rotate or remove pages</string>
     <string name="tool_compress">Compress PDF</string>
     <string name="tool_compress_hint">Make a file smaller for forms and WhatsApp</string>
     <string name="tool_lock">Add password</string>
@@ -117,6 +118,25 @@
     <string name="tool_unlock_hint">You need to know the password</string>
     <string name="tool_text">PDF to text</string>
     <string name="tool_text_hint">Get the text out of a PDF</string>
+    <string name="tools_group_convert">Convert</string>
+    <string name="tools_group_pdf">PDF tools</string>
+    <string name="tools_group_photo">Photos and scan</string>
+    <string name="tool_pdf_to_word">PDF to Word</string>
+    <string name="tool_pdf_to_word_hint">Make an editable Word file</string>
+    <string name="tool_word_to_pdf">Word to PDF</string>
+    <string name="tool_word_to_pdf_hint">Turn a DOCX or DOC file into a PDF</string>
+    <string name="tool_pdf_to_jpg">PDF to JPG</string>
+    <string name="tool_pdf_to_jpg_hint">Save every page as an image</string>
+    <string name="tool_text_to_pdf">Text to PDF</string>
+    <string name="tool_text_to_pdf_hint">Turn a TXT file into a PDF</string>
+    <string name="tool_shrink_photo">Shrink photo</string>
+    <string name="tool_shrink_photo_hint">Make a photo or signature small enough for exam and job forms</string>
+    <string name="tool_percent" translatable="false">%1$d%%</string>
+    <string name="tool_image_count">%1$d images, %2$s</string>
+    <string name="compress_50">Under 50 KB</string>
+    <string name="convert_some_skipped">Some content, like text boxes, charts or some pictures, could not be included.</string>
+    <string name="word_some_pictures">Some pages could not be read as text, so they are pictures in the Word file. They look right but can\'t be edited.</string>
+    <string name="error_word_locked">This Word file has a password. Remove the password first, then try again.</string>
     <string name="tool_working">Working…</string>
     <string name="tool_done">Done</string>
     <string name="tool_saved">Saved</string>
@@ -144,4 +164,18 @@
     <string name="error_no_app">No app found for this</string>
     <string name="text_none_found">No text found. This looks like a scanned PDF.</string>
     <string name="error_pdf_restricted">The owner of this PDF has blocked this change.</string>
+    <string name="tools_private">Everything runs on your phone. Files are never uploaded.</string>
+    <string name="action_change">Change</string>
+    <string name="action_move_back">Move back</string>
+    <string name="action_move_ahead">Move ahead</string>
+    <string name="tool_target_size">Target size</string>
+    <string name="tool_smaller">%1$d%% smaller</string>
+    <string name="compress_already_small">This file is already under that size, so it was left unchanged.</string>
+    <string name="tool_extract">Extract pages</string>
+    <string name="tool_extract_hint">Make a new PDF from the pages you choose</string>
+    <string name="tool_split_after">Split after page</string>
+    <string name="tool_split_preview">Part 1: pages %1$d–%2$d · Part 2: pages %3$d–%4$d</string>
+    <string name="tool_split_one_page">This PDF has only 1 page, so it can\'t be split.</string>
+    <string name="tool_merge_need_two">Add at least 2 PDFs to merge.</string>
+    <string name="unlock_not_locked">This PDF had no password, so nothing was removed.</string>
 </resources>

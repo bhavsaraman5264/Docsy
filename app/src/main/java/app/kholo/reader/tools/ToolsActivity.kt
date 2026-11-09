@@ -1,10 +1,12 @@
 package app.kholo.reader.tools
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,6 +28,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.kholo.reader.KholoApp
 import app.kholo.reader.R
 import app.kholo.reader.ViewerActivity
+import app.kholo.reader.core.file.COPY_BUFFER
 import app.kholo.reader.settings.LanguageStore
 import app.kholo.reader.ui.theme.AppTheme
 import java.io.File
@@ -35,7 +38,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val EXTRA_TOOL = "tool"
-private const val PDF_MIME = "application/pdf"
 private const val MAX_PHOTOS = 50
 
 /** Har tool isi Activity me chalta hai. Camera ki permission nahi lagti, photo system camera app leta hai. */
@@ -64,6 +66,9 @@ class ToolsActivity : ComponentActivity() {
                 val pickMany = rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenMultipleDocuments(),
                 ) { viewModel.addInputs(it) }
+                val pickPhoto = rememberLauncherForActivityResult(
+                    ActivityResultContracts.PickVisualMedia(),
+                ) { uri -> uri?.let { viewModel.addInputs(listOf(it)) } }
                 val pickPhotos = rememberLauncherForActivityResult(
                     ActivityResultContracts.PickMultipleVisualMedia(MAX_PHOTOS),
                 ) { viewModel.addInputs(it) }
@@ -75,6 +80,12 @@ class ToolsActivity : ComponentActivity() {
                     // ViewModel se, kyunki file picker ke beech phone ghume to Activity nayi hoti hai.
                     val result = viewModel.state.value.result
                     if (uri != null && result != null) save(result.file, uri)
+                }
+                val folderSaver = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocumentTree(),
+                ) { tree ->
+                    val result = viewModel.state.value.result
+                    if (tree != null && result != null) saveAll(result, tree)
                 }
                 val pick: () -> Unit = {
                     when (kind) {
@@ -90,8 +101,11 @@ class ToolsActivity : ComponentActivity() {
                                 toast(R.string.error_no_app)
                             }
                         }
-                        ToolKind.Merge -> pickMany.launch(arrayOf(PDF_MIME))
-                        else -> pickOne.launch(arrayOf(PDF_MIME))
+                        ToolKind.ShrinkPhoto -> pickPhoto.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                        ToolKind.Merge -> pickMany.launch(kind.input.mimes)
+                        else -> pickOne.launch(kind.input.mimes)
                     }
                 }
                 LaunchedEffect(Unit) {
@@ -105,7 +119,13 @@ class ToolsActivity : ComponentActivity() {
                     actions = ToolActions(
                         onBack = ::finish,
                         onPick = pick,
-                        onSave = { saver.launch(it.name to it.mime) },
+                        onSave = { result ->
+                            if (result.files.size > 1) {
+                                folderSaver.launch(null)
+                            } else {
+                                saver.launch(result.name to result.mime)
+                            }
+                        },
                         onShare = ::share,
                         onOpen = ::open,
                     ),
@@ -119,12 +139,31 @@ class ToolsActivity : ComponentActivity() {
         lifecycleScope.launch { toast(withContext(Dispatchers.IO) { write(file, target) }) }
     }
 
+    /** Kai files ke liye user folder chunta hai. Isme storage permission nahi lagti. */
+    private fun saveAll(result: ToolResult, tree: Uri) {
+        lifecycleScope.launch { toast(withContext(Dispatchers.IO) { writeAll(result, tree) }) }
+    }
+
+    private fun writeAll(result: ToolResult, tree: Uri): Int = try {
+        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        result.files.map { file ->
+            val target = DocumentsContract.createDocument(contentResolver, parent, result.mime, file.name)
+            if (target == null) R.string.error_file_gone else write(file, target)
+        }.firstOrNull { it != R.string.tool_saved } ?: R.string.tool_saved
+    } catch (_: IOException) {
+        R.string.error_no_space
+    } catch (_: SecurityException) {
+        R.string.error_file_gone
+    } catch (_: IllegalArgumentException) {
+        R.string.error_file_gone
+    }
+
     private fun write(file: File, target: Uri): Int = try {
         val stream = contentResolver.openOutputStream(target)
         if (stream == null) {
             R.string.error_file_gone
         } else {
-            stream.use { out -> file.inputStream().use { it.copyTo(out) } }
+            stream.use { out -> file.inputStream().use { it.copyTo(out, COPY_BUFFER) } }
             R.string.tool_saved
         }
     } catch (_: IOException) {
@@ -136,11 +175,21 @@ class ToolsActivity : ComponentActivity() {
     }
 
     private fun share(result: ToolResult) {
-        val uri = FileProvider.getUriForFile(this, authority, result.file)
-        val send = Intent(Intent.ACTION_SEND)
-            .setType(result.mime)
-            .putExtra(Intent.EXTRA_STREAM, uri)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val uris = result.files.map { FileProvider.getUriForFile(this, authority, it) }
+        val send = if (uris.size > 1) {
+            Intent(Intent.ACTION_SEND_MULTIPLE)
+                .setType(result.mime)
+                .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                .also { intent ->
+                    // Permission ClipData ke saare URIs par lagti hai, sirf pehle par nahi.
+                    val clip = ClipData.newRawUri(null, uris.first())
+                    uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+                    intent.clipData = clip
+                }
+        } else {
+            Intent(Intent.ACTION_SEND).setType(result.mime).putExtra(Intent.EXTRA_STREAM, uris.first())
+        }
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         launch(Intent.createChooser(send, null))
     }
 

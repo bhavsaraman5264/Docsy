@@ -11,7 +11,7 @@ import java.io.InputStream
 
 private const val DIR = "open"
 private const val SPACE_MARGIN = 2L
-private const val COPY_BUFFER = 64 * 1024
+internal const val COPY_BUFFER = 64 * 1024
 
 /** Sirf kholi hui file ke liye private cache. Viewer band hote hi delete, aur app start par safai. */
 class TempFiles(context: Context) {
@@ -29,7 +29,7 @@ class TempFiles(context: Context) {
         val file = newFile(suffix)
         val copied = try {
             appContext.contentResolver.openInputStream(uri)?.use { source ->
-                file.outputStream().use { source.copyTo(it) }
+                file.outputStream().use { source.copyTo(it, COPY_BUFFER) }
             }
         } catch (e: IOException) {
             file.delete()

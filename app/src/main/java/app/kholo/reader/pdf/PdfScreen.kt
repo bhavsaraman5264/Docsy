@@ -101,7 +101,7 @@ fun PdfScreen(
             startPage = doc.reading.page.coerceIn(0, doc.document.pageCount - 1),
             onPage = viewModel::onPageChanged,
             onFit = viewModel::onFitChanged,
-            onUserScroll = viewModel::hideControls,
+            onUserScroll = viewModel::onUserScroll,
         ).also { controller ->
             controller.attach(scope)
             host.pdfView.pdfDocument = doc.document
@@ -161,6 +161,26 @@ fun PdfScreen(
                         )
                     }
                 }
+            }
+            AnimatedVisibility(
+                visible = state.pageCount >= MIN_SCROLLER_PAGES && state.search == null &&
+                    (state.controlsVisible || state.scrollerVisible || state.scrubbing),
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                PageScroller(
+                    page = state.page,
+                    pageCount = state.pageCount,
+                    topInset = topBar,
+                    onDragStart = viewModel::startScrub,
+                    onJump = zoom::jumpTo,
+                    onDragEnd = { page ->
+                        zoom.jumpTo(page)
+                        viewModel.endScrub(page)
+                        zoom.endJump()
+                    },
+                    onClick = { viewModel.showPageJump(true) },
+                )
             }
             AnimatedVisibility(
                 visible = state.controlsVisible || !state.atFit,

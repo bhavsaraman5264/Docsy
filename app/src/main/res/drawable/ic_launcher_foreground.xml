@@ -1,18 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Docsy ka logo. Scale aisa hai ki gol icon me bhi page ke kone na katein. -->
+<!--
+  Docsy ka logo: mude kone wala cream page, peeche do caramel page.
+  Chrome extension ke public/icons/logo.svg jaisa hi drawing hai.
+  Sab kuch 66dp ke safe zone me hai, taaki gol icon me bhi kone na katein.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:scaleX="0.098"
-        android:scaleY="0.098"
-        android:translateX="17.05"
-        android:translateY="17.45">
-        <path
-            android:fillColor="@color/icon_foreground"
-            android:fillType="evenOdd"
-            android:pathData="M216,102L428,102Q436,102 442,108L572,238Q578,244 578,252L578,604Q578,644 538,644L216,644Q176,644 176,604L176,142Q176,102 216,102Z M437,140L538,243L457,243Q437,243 437,223Z M284,362L469,362L469,384L284,384Z M284,410L469,410L469,431L284,431Z M284,457L469,457L469,478L284,478Z M284,503L388,503L388,525L284,525Z" />
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.95"
+        android:scaleY="0.95">
+
+        <!-- Sabse peeche wala page. -->
+        <path android:pathData="M50,34H74Q80,34 80,40V76Q80,82 74,82H50Q44,82 44,76V40Q44,34 50,34Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="44" android:startY="34" android:endX="80" android:endY="82">
+                    <item android:offset="0" android:color="#FFE5A060" />
+                    <item android:offset="1" android:color="#FFB9692F" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- Beech wala page, thoda daayen ghooma hua. -->
+        <group android:pivotX="59" android:pivotY="51" android:rotation="8">
+            <path android:pathData="M46,26H72Q78,26 78,32V70Q78,76 72,76H46Q40,76 40,70V32Q40,26 46,26Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:type="linear" android:startX="40" android:startY="26" android:endX="78" android:endY="76">
+                        <item android:offset="0" android:color="#FFF7C890" />
+                        <item android:offset="1" android:color="#FFDC8E4E" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
+
+        <!-- Saamne wala page, baayen ghooma hua, mude kone ke saath. -->
+        <group android:pivotX="49" android:pivotY="55" android:rotation="-10">
+            <group android:translateX="1.6" android:translateY="2.6">
+                <path
+                    android:fillAlpha="0.28"
+                    android:fillColor="#FF1A0E08"
+                    android:pathData="M34,30H64Q68,30 68,34V59C66,70 59,78 47,80H34Q30,80 30,76V34Q30,30 34,30Z" />
+            </group>
+            <path android:pathData="M34,30H64Q68,30 68,34V59C66,70 59,78 47,80H34Q30,80 30,76V34Q30,30 34,30Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="80">
+                        <item android:offset="0" android:color="#FFFFFCF7" />
+                        <item android:offset="1" android:color="#FFF5E6D4" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+            <path
+                android:pathData="M37,43H58M37,51H55M37,59H49"
+                android:strokeWidth="4.6"
+                android:strokeColor="#FFC48B62"
+                android:strokeLineCap="round" />
+            <group android:translateX="-1" android:translateY="1.2">
+                <path
+                    android:fillAlpha="0.35"
+                    android:fillColor="#FF7A4524"
+                    android:pathData="M68,59C59,61 52,68 47,80C50,79 52,78.4 53.5,77.6C60,74 65.5,68 68,59Z" />
+            </group>
+            <path android:pathData="M68,59C59,61 52,68 47,80C58,78.5 65.5,71 68,59Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:type="linear" android:startX="68" android:startY="59" android:endX="47" android:endY="80">
+                        <item android:offset="0" android:color="#FFF6BE80" />
+                        <item android:offset="1" android:color="#FFC9773A" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
     </group>
 </vector>

@@ -15,9 +15,9 @@ class PinchSmokeTest {
         val uri = InstrumentationRegistry.getArguments().getString("uri")
         device.executeShellCommand(
             "am start -a android.intent.action.VIEW -t application/pdf -d $uri --grant-read-uri-permission " +
-                "-n app.kholo.reader/.ViewerActivity",
+                "-n app.docsy.reader/app.kholo.reader.ViewerActivity",
         )
-        val pdf = device.wait(Until.findObject(By.pkg("app.kholo.reader").depth(0)), 10_000)
+        val pdf = device.wait(Until.findObject(By.pkg("app.docsy.reader").depth(0)), 10_000)
         assertNotNull(pdf)
         pdf.setGestureMarginPercentage(0.25f)
         pdf.pinchOpen(0.8f, 1500)

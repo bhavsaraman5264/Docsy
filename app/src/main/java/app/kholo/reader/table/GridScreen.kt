@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +75,7 @@ import app.kholo.reader.viewer.DocumentScaffold
 import app.kholo.reader.viewer.FindState
 import app.kholo.reader.viewer.ReaderActions
 import app.kholo.reader.viewer.findBarOf
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -85,6 +87,7 @@ private val THUMB_HEIGHT = 56.dp
 private const val MAX_CELL_CHARS = 256
 private const val REFRESH_MS = 700L
 private const val MIN_SCROLLBAR_ITEMS = 40
+private const val GRID_ROW = 0
 
 @Composable
 fun GridScreen(
@@ -121,7 +124,6 @@ fun GridScreen(
 @Composable
 private fun Table(source: TableSource, viewModel: GridViewModel, find: FindState<GridHit>, modifier: Modifier) {
     val info by source.info.collectAsStateWithLifecycle()
-    val version by viewModel.version.collectAsStateWithLifecycle()
     var sheet by remember { mutableIntStateOf(0) }
     var opened by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(info.finished, sheet) {
@@ -152,7 +154,7 @@ private fun Table(source: TableSource, viewModel: GridViewModel, find: FindState
             find.hits.groupBy { it.row }.mapValues { (_, hits) -> hits.associate { it.column to (it == hit) } }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            GridBody(info, list, horizontal, viewModel, version, marks) { opened = it }
+            GridBody(info, list, horizontal, viewModel, marks) { opened = it }
             FastScrollbar(list, info.rowCount, Modifier.align(Alignment.CenterEnd))
         }
         if (source.sheets.size > 1) {
@@ -200,7 +202,6 @@ private fun GridBody(
     list: LazyListState,
     horizontal: ScrollState,
     viewModel: GridViewModel,
-    version: Int,
     marks: Map<Int, Map<Int, Boolean>>,
     onCell: (String) -> Unit,
 ) {
@@ -211,22 +212,27 @@ private fun GridBody(
     val columnPx = with(density) { COLUMN_WIDTH.toPx() }
     val numberPx = with(density) { NUMBER_WIDTH.toPx() }
     val total = NUMBER_WIDTH + COLUMN_WIDTH * info.columnCount.coerceAtLeast(1)
-    val colors = GridColors(
-        text = MaterialTheme.colorScheme.onSurface,
-        muted = MaterialTheme.colorScheme.onSurfaceVariant,
-        line = MaterialTheme.colorScheme.outlineVariant,
-        frozen = MaterialTheme.colorScheme.surface,
-        header = MaterialTheme.colorScheme.primaryContainer,
-    )
-    val metrics = GridMetrics(columnPx, numberPx)
+    val scheme = MaterialTheme.colorScheme
+    // Import ke dauran info baar-baar badalta hai. Naye object se har dikhti row dobara draw hoti.
+    val colors = remember(scheme) {
+        GridColors(
+            text = scheme.onSurface,
+            muted = scheme.onSurfaceVariant,
+            line = scheme.outlineVariant,
+            frozen = scheme.surface,
+            header = scheme.primaryContainer,
+        )
+    }
+    val metrics = remember(columnPx, numberPx) { GridMetrics(columnPx, numberPx) }
     Box(Modifier.fillMaxSize().horizontalScroll(horizontal)) {
         Column(Modifier.width(total).fillMaxHeight()) {
             Canvas(Modifier.fillMaxWidth().height(rowHeight).background(colors.header)) {
                 drawRow(info.header, "", horizontal.value, metrics, measurer, colors, bold = true)
             }
             LazyColumn(state = list, modifier = Modifier.fillMaxSize()) {
-                items(info.rowCount) { index ->
-                    val row = remember(index, version) { viewModel.row(index) }
+                items(info.rowCount, contentType = { GRID_ROW }) { index ->
+                    val stamp = viewModel.stamp(index)
+                    val row = remember(index, stamp) { viewModel.row(index) }
                     Canvas(
                         Modifier
                             .fillMaxWidth()
@@ -338,11 +344,14 @@ fun FastScrollbar(list: LazyListState, rowCount: Int, modifier: Modifier) {
                 }
             },
     ) {
-        val offset = (list.firstVisibleItemIndex.toFloat() / rowCount) * (height - thumbPx)
         Box(
             Modifier
                 .align(Alignment.TopEnd)
-                .offset(y = with(density) { offset.toDp() })
+                // Scroll ki jagah sirf layout me padhi jati hai, har row par scrollbar dobara nahi banta.
+                .offset {
+                    val fraction = list.firstVisibleItemIndex.toFloat() / rowCount
+                    IntOffset(0, (fraction * (height - thumbPx)).roundToInt())
+                }
                 .width(6.dp)
                 .height(THUMB_HEIGHT)
                 .background(thumbColor, MaterialTheme.shapes.small),

@@ -5,7 +5,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +34,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,7 +52,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,23 +66,20 @@ import app.kholo.reader.open.DocumentType
 import app.kholo.reader.ui.components.FindAction
 import app.kholo.reader.ui.components.FindCurrentColor
 import app.kholo.reader.ui.components.FindHitColor
+import app.kholo.reader.ui.components.ListScroller
+import app.kholo.reader.ui.components.RowJump
 import app.kholo.reader.ui.theme.Spacing
 import app.kholo.reader.viewer.DocumentScaffold
 import app.kholo.reader.viewer.FindState
 import app.kholo.reader.viewer.ReaderActions
 import app.kholo.reader.viewer.findBarOf
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private val ROW_HEIGHT = 40.dp
 private val COLUMN_WIDTH = 132.dp
 private val NUMBER_WIDTH = 56.dp
-private val SCROLLBAR_WIDTH = 28.dp
-private val THUMB_HEIGHT = 56.dp
 private const val MAX_CELL_CHARS = 256
 private const val REFRESH_MS = 700L
-private const val MIN_SCROLLBAR_ITEMS = 40
 private const val GRID_ROW = 0
 
 @Composable
@@ -155,7 +148,9 @@ private fun Table(source: TableSource, viewModel: GridViewModel, find: FindState
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             GridBody(info, list, horizontal, viewModel, marks) { opened = it }
-            FastScrollbar(list, info.rowCount, Modifier.align(Alignment.CenterEnd))
+            ListScroller(list, info.rowCount, jump = RowJump) {
+                stringResource(R.string.page_indicator, it + 1, info.rowCount)
+            }
         }
         if (source.sheets.size > 1) {
             PrimaryScrollableTabRow(selectedTabIndex = sheet, modifier = Modifier.navigationBarsPadding()) {
@@ -261,7 +256,14 @@ private fun GridBody(
     }
 }
 
-private class GridColors(val text: Color, val muted: Color, val line: Color, val frozen: Color, val header: Color)
+/** Text styles yahin ek baar bante hain. Pehle scroll ke har frame par har row naye style banati thi. */
+private class GridColors(text: Color, muted: Color, val line: Color, val frozen: Color, val header: Color) {
+    val plain = TextStyle(color = text, fontSize = 14.sp, fontWeight = FontWeight.Normal)
+    val bold = plain.copy(fontWeight = FontWeight.SemiBold)
+    val plainMarked = plain.copy(color = Color.Black)
+    val boldMarked = bold.copy(color = Color.Black)
+    val number = plain.copy(color = muted, fontSize = 12.sp)
+}
 
 private class GridMetrics(val column: Float, val number: Float)
 
@@ -276,11 +278,7 @@ private fun DrawScope.drawRow(
     bold: Boolean,
     marks: Map<Int, Boolean>? = null,
 ) {
-    val style = TextStyle(
-        color = colors.text,
-        fontSize = 14.sp,
-        fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal,
-    )
+    val style = if (bold) colors.bold else colors.plain
     val padding = 8.dp.toPx()
     val first = ((scroll - metrics.number) / metrics.column).toInt().coerceAtLeast(0)
     val last = ((scroll + size.width) / metrics.column).toInt() + 1
@@ -298,7 +296,11 @@ private fun DrawScope.drawRow(
         }
         val layout = measurer.measure(
             text = text,
-            style = if (mark != null) style.copy(color = Color.Black) else style,
+            style = when {
+                mark == null -> style
+                bold -> colors.boldMarked
+                else -> colors.plainMarked
+            },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             constraints = cellConstraints,
@@ -317,44 +319,7 @@ private fun DrawScope.drawRow(
         strokeWidth = 1f,
     )
     if (number.isNotEmpty()) {
-        val layout = measurer.measure(number, style.copy(color = colors.muted, fontSize = 12.sp), maxLines = 1)
+        val layout = measurer.measure(number, colors.number, maxLines = 1)
         drawText(layout, topLeft = Offset(left + padding, (size.height - layout.size.height) / 2))
-    }
-}
-
-/** Lakhon rows me ungli se kisi bhi jagah tez pahunchne ke liye. */
-@Composable
-fun FastScrollbar(list: LazyListState, rowCount: Int, modifier: Modifier) {
-    if (rowCount < MIN_SCROLLBAR_ITEMS) return
-    val scope = rememberCoroutineScope()
-    var height by remember { mutableIntStateOf(1) }
-    val density = LocalDensity.current
-    val thumbPx = with(density) { THUMB_HEIGHT.toPx() }
-    val thumbColor = MaterialTheme.colorScheme.primary
-    Box(
-        modifier
-            .fillMaxHeight()
-            .width(SCROLLBAR_WIDTH)
-            .pointerInput(rowCount) {
-                height = size.height
-                detectVerticalDragGestures { change, _ ->
-                    val fraction = (change.position.y / size.height).coerceIn(0f, 1f)
-                    val target = (fraction * (rowCount - 1)).toInt()
-                    scope.launch { list.scrollToItem(target) }
-                }
-            },
-    ) {
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                // Scroll ki jagah sirf layout me padhi jati hai, har row par scrollbar dobara nahi banta.
-                .offset {
-                    val fraction = list.firstVisibleItemIndex.toFloat() / rowCount
-                    IntOffset(0, (fraction * (height - thumbPx)).roundToInt())
-                }
-                .width(6.dp)
-                .height(THUMB_HEIGHT)
-                .background(thumbColor, MaterialTheme.shapes.small),
-        )
     }
 }

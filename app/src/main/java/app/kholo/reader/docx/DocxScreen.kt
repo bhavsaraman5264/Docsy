@@ -55,6 +55,7 @@ import app.kholo.reader.office.OfficeContent
 import app.kholo.reader.open.DocumentType
 import app.kholo.reader.ui.components.BarTextButton
 import app.kholo.reader.ui.components.FindAction
+import app.kholo.reader.ui.components.ListScroller
 import app.kholo.reader.ui.components.highlighted
 import app.kholo.reader.ui.components.pinchFontSize
 import app.kholo.reader.ui.theme.Spacing
@@ -143,8 +144,14 @@ private fun ReadingList(
             verticalArrangement = Arrangement.spacedBy(Spacing.m),
         ) {
             item { ReadingViewNote(type) }
-            items(document.blocks) { block -> Block(block, fontSize, viewModel) }
+            // Ek jaisi kism ke blocks ek doosre ka bana dhancha dobara use karte hain, scroll halka rehta hai.
+            items(document.blocks, contentType = { it::class }) { block ->
+                Block(block, fontSize, viewModel)
+            }
         }
+        // Pehla item upar wala note hai.
+        val items = document.blocks.size + 1
+        ListScroller(list, items) { stringResource(R.string.scroll_percent, it * 100 / (items - 1)) }
     }
 }
 

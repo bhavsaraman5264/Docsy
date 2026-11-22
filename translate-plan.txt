@@ -1,0 +1,97 @@
+# Translate tool: English ↔ Hindi (PDF, Word, Excel)
+
+## Context
+User chahte hain ki Docsy English PDF, Word aur Excel ko Hindi me badal de (aur Hindi ko English me). User ke faisle (2026-11-08):
+- **Google ML Kit on-device translation.** Model (~30 MB) ek baar download hoga, isliye `INTERNET` permission aayegi. Translation phone par hi hoga aur file kabhi bahar nahi jayegi.
+- **PDF ka result PDF me hi milega**, saaf naye layout me. Headings, bold aur photos rahenge, lekin columns, boxes aur original jagah nahi bachegi.
+- **Model app ke andar se download hoga:** Translate tool pehli baar kholne par ek button. User ko alag app ya setting nahi karni. Play Store install ke saath model nahi aata, taaki jo feature use nahi karte unka data aur jagah bache.
+- **Dono taraf:** EN→HI aur HI→EN. Ek hi model dono taraf chalta hai.
+
+Abhi code me translation, OCR aur INTERNET kuch bhi nahi hai. Hindi likhne wala hissa pehle se theek hai: `DocxWriter` me `w:cs="Mangal"` hai, aur `DocumentPdfWriter` Android ki shaping use karta hai.
+
+## Plan
+
+### 1. Library aur privacy check
+- `gradle/libs.versions.toml` + `app/build.gradle.kts`: `com.google.mlkit:translate` jodna.
+- Build ke baad `aapt2 dump permissions` aur merged manifest dekhna. `INTERNET` aur `ACCESS_NETWORK_STATE` aana tay hai.
+- **Ruk kar check:** ML Kit ke saath koi aur permission ya telemetry provider (datatransport/firelog) aaye to user ko bataunga. Privacy policy aur Data safety me ye likhna padega.
+- Memory update: "no INTERNET" wala wada badal gaya, sirf model download ke liye.
+
+### 2. Translation engine (naya package `app/kholo/reader/translate/`)
+- `TextTranslator.kt`: `interface TextTranslator { suspend fun translate(text: String): String }`, taaki unit tests me nakli translator chale.
+- `MlKitTranslator.kt`: `Translation.getClient(TranslatorOptions(source, target))`. Andar ka kaam:
+  - `downloadModelIfNeeded()`
+  - `RemoteModelManager` se model hai ya nahi, aur model hatane ki suvidha
+  - `close()`
+- `TranslateText.kt` (pure Kotlin, testable):
+  - **Kya chhodna hai:** khaali text, sirf number, date, email ya URL, aur jo pehle se target script me ho. Devanagari range check se pata chalega, kisi language-ID library ki zaroorat nahi.
+  - **Lamba text:** sentence par todna, taaki ML Kit ki quality bani rahe.
+  - **Cache:** `HashMap` me har text ka translation yaad rakhna. Excel me ek hi shabd baar-baar aata hai.
+  - **Placeholders:** `PAGE_NUMBER_MARK` / `PAGE_TOTAL_MARK` (``/``, `docx/DocBlock.kt` me) jaise ke taise rakhne hain.
+
+### 3. Word (.docx), formatting bachakar
+- `DocxTranslator.kt`: original zip ki copy banana aur sirf text badalna. Badalne wali files: `word/document.xml`, header, footer, footnotes, endnotes.
+- XmlPullParser + XmlSerializer se streaming. Namespace processing band rakhenge taaki prefixes aur `xmlns` waise hi rahein.
+- **Har `<w:p>` ka kaam:** saare `<w:t>` ka text jodkar ek baar translate karna. Pura translation pehle run ke `<w:t xml:space="preserve">` me jayega, baaki runs khaali honge. Paragraph, table aur image ki formatting bachegi. Paragraph ke andar mixed bold/italic pehle run jaisa ho jayega, v1 ke liye theek hai.
+- **Zip helper:** `DocxWriter.kt` ka `ZipOutputStream` aur `xmlText` wala pattern ek chhote `ZipRewrite` helper me dobara use hoga.
+- **Purani .doc file:** v1 me nahi chalegi. Saaf message dikhega: "Pehle .docx me save karein".
+
+### 4. Excel (.xlsx), formatting bachakar
+- `XlsxTranslator.kt`: zip ki copy banana, aur `xl/sharedStrings.xml` ke har `<si>` ka text translate karna. Rich text ke liye wahi first-run trick.
+- Sheets me `t="inlineStr"` wale cells bhi translate honge.
+- **Jo nahi chhuenge:** numbers, formulas (`<f>`), aur sheet ke naam.
+- **Purani .xls aur .csv:** v1 me nahi, saaf message dikhega.
+
+### 5. PDF → translated PDF
+- **Padhne wala hissa alag karna:** `convert/PdfToWord.kt` me se `PdfPageReader` nikalna. Ye har page ke items deta hai: paragraphs (`PageLayout.paragraphs` se) aur pictures. Picture ya to page par lagi photo hai, ya poora page (jab `PageQuality.readable` fail ho).
+- `PdfToWord` isi reader se `DocxWriter` me likhega, isliye PDF to Word tool waisa hi chalega. Uske purane tests is refactor ki jaanch karenge.
+- **Translate ka raasta:**
+  1. Reader ke har `PageParagraph` ka text (saare `WordRun` jodkar) translate karna.
+  2. Usse `DocBlock.Paragraph` banana: heading, pehle run ka bold/size `AnnotatedString` me, aur centering `align` me.
+  3. Pictures ko scratch file me likhkar `DocBlock.Image` banana.
+  4. Har PDF page ke baad `DocBlock.PageBreak` daalna.
+  5. Pura `ParsedDocument` `convert/DocumentPdfWriter.write()` ko dena. Ye Android `PdfDocument` + `StaticLayout` se Hindi sahi jodkar likhta hai.
+- **Scan ya picture pages** picture hi rahenge. Note dikhega: "X page scan hain, unka translation nahi hua" (OCR abhi nahi hai).
+- **Memory:** pages ek-ek karke padhe jayenge, taaki bade PDF me memory na phate.
+- `DocxWriter` ki styles me `<w:lang w:bidi="hi-IN"/>` jodna, taaki Word me Hindi ka sahi font aaye (Word translate ke liye).
+
+### 6. Tools screen par naya tool
+- `tools/ToolKind.kt`:
+  - `ToolKind.Translate`, group `Convert`, flow badge `"EN" to "HI"`.
+  - Naya `ToolInputType.Document` (PDF + DOCX + XLSX mimes).
+  - Input ka asli type file ke shuru ke bytes aur zip entries (`word/` ya `xl/`) se pakka hoga.
+- `tools/ToolOptions.kt`:
+  - Direction switch (English → Hindi / Hindi → English).
+  - Jab model na ho: "Hindi model download (~30 MB), Wi-Fi behtar" card. Usme "Mobile data se bhi" ka chunav (`DownloadConditions.requireWifi`) aur indeterminate progress.
+  - Model hone par chhota "Model hatao" button.
+- `tools/ToolsViewModel.kt`:
+  - `runTranslate()` wahi `produce(...)` pattern use karega jo `runPdfToWord` / `runWordToPdf` me hai.
+  - Progress `step()` se aayega. Har string ya paragraph par cancel check hoga.
+  - Output ka type input jaisa hi: PDF→PDF, DOCX→DOCX, XLSX→XLSX. Naam `<naam>-hindi.pdf` / `-english.xlsx` jaisa.
+  - `ToolResult.typeLabel` me XLS jodna.
+- **Errors** `attempt()` me: internet nahi, model download fail, `WordLocked`, aur `.doc`/`.xls` support nahi.
+- Strings `res/values/strings.xml` aur `res/values-hi/strings.xml` dono me. Icon `ic_translate` hoga.
+
+## Jo v1 me nahi hai (user ko bataunga)
+- Scan PDF (OCR ke baad aayega)
+- Purani .doc/.xls files
+- PDF ka original layout
+- Paragraph ke andar mixed formatting
+
+Machine translation hai, isliye legal ya bank kaagaz ke liye "check kar lein" wali chhoti line result par dikhegi.
+
+## Verification
+1. **Unit tests** (nakli uppercase translator ke saath):
+   - DocxTranslator: `rich.docx` me text badla, styles, tables aur images ki XML same rahi, aur file dobara `DocxParser` se khulti hai.
+   - XlsxTranslator: `rich.xlsx` me sharedStrings badle, numbers aur formulas wahi rahe, aur `XlsxPackage.read` chalta hai.
+   - TranslateText: skip rules, cache, placeholders.
+   - PdfToWord: refactor ke baad purane tests pass hone chahiye.
+  - PDF translate: nakli translator ke saath `rotated-pages.pdf` se bani PDF me utne hi page-breaks hon aur text badla ho.
+2. **Release build** par `aapt2 dump permissions`: sirf INTERNET aur NETWORK_STATE nayi honi chahiye. APK size pehle se compare karna.
+3. **Phone par** (memory ke phone-test-flow se, Gradle chalane se pehle user se poochkar; phone par internet chahiye):
+   - Model download karna.
+   - `rich.docx`, `rich.xlsx` aur ek English PDF ko Hindi me translate karna, aur ek Hindi file ko English me.
+   - Result Docsy me aur WPS/Word me khol kar dekhna ki Hindi akshar sahi jude hain.
+   - Cancel beech me dabana.
+   - Model download ke baad flight mode me bhi translation chalna chahiye.
+4. User khud phone par check karega, uske baad hi aage badhenge.

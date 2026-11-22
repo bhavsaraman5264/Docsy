@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import app.kholo.reader.open.IntentParser
 import app.kholo.reader.settings.LanguageStore
+import app.kholo.reader.ui.adaptive.preferHighRefreshRate
 import app.kholo.reader.ui.theme.AppTheme
 import app.kholo.reader.viewer.ViewerRoute
 
@@ -34,6 +35,7 @@ class ViewerActivity : ComponentActivity() {
             return
         }
         enableEdgeToEdge()
+        preferHighRefreshRate()
         val container = (application as KholoApp).container
         container.warmPdfEngine()
         setContent {

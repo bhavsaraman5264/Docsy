@@ -20,18 +20,14 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +53,8 @@ import androidx.pdf.PdfRect
 import app.kholo.reader.R
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.ui.components.AppTopBar
+import app.kholo.reader.ui.components.JumpDialog
+import app.kholo.reader.ui.components.PageJump
 import app.kholo.reader.ui.components.scaledBarHeight
 import app.kholo.reader.ui.theme.KholoTheme
 import app.kholo.reader.ui.theme.LocalBarColors
@@ -200,8 +197,9 @@ fun PdfScreen(
         }
     }
     if (state.showPageJump) {
-        PageJumpDialog(
-            pageCount = state.pageCount,
+        JumpDialog(
+            labels = PageJump,
+            count = state.pageCount,
             onJump = { page ->
                 host.pdfView.scrollToPage(page)
                 viewModel.showPageJump(false)
@@ -303,29 +301,4 @@ private fun BottomControls(
             Button(onClick = onFit, shape = MaterialTheme.shapes.small) { Text(stringResource(R.string.action_fit)) }
         }
     }
-}
-
-@Composable
-private fun PageJumpDialog(pageCount: Int, onJump: (Int) -> Unit, onDismiss: () -> Unit) {
-    var text by remember { mutableStateOf("") }
-    val page = text.toIntOrNull()?.takeIf { it in 1..pageCount }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.page_jump_title)) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it.filter(Char::isDigit) },
-                singleLine = true,
-                label = { Text(stringResource(R.string.page_jump_hint, pageCount)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { page?.let { onJump(it - 1) } }, enabled = page != null) {
-                Text(stringResource(R.string.action_go))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
 }

@@ -5,25 +5,15 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.util.LruCache
-import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.kholo.reader.R
-import app.kholo.reader.convert.DocumentLoader
-import app.kholo.reader.convert.DocumentPdfWriter
-import app.kholo.reader.convert.PdfToWord
 import app.kholo.reader.convert.WordLocked
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.AppError
 import app.kholo.reader.core.DocResult
-import app.kholo.reader.core.file.COPY_BUFFER
-import app.kholo.reader.core.file.SafeZip
 import app.kholo.reader.core.file.toAppError
 import app.kholo.reader.core.log.AppLog
 import app.kholo.reader.core.log.LogTag
-import app.kholo.reader.docx.DocBlock
-import app.kholo.reader.docx.ParsedDocument
-import app.kholo.reader.text.TextDecoder
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import java.io.File
 import java.io.FileNotFoundException
@@ -46,18 +36,8 @@ private const val THUMB_WIDTH = 240
 private const val PHOTO_THUMB_SIDE = 256
 private const val THUMB_CACHE_BYTES = 16 * 1024 * 1024
 
-/** Render aur JPEG saath chalte hain. Har page ki tasveer ~15 MB hai, isliye do se zyada nahi. */
-private const val IMAGE_WORKERS = 2
-private const val PDF_MIME = "application/pdf"
-private const val TEXT_MIME = "text/plain"
-private const val DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-private const val JPEG_MIME = "image/jpeg"
 private const val POINTS_PER_INCH = 72
-private const val IMAGE_DPI = 200
-private const val WORD_PICTURE_DPI = 150
-private const val JPEG_QUALITY = 88
 private const val PERCENT = 100
-private const val MAX_TEXT_BYTES = 32L * 1024 * 1024
 private const val MAX_BITMAP_SIDE = 4096
 
 data class ToolInput(val uri: Uri, val name: String, val size: Long)
@@ -148,7 +128,7 @@ class ToolsViewModel(val kind: ToolKind, private val container: AppContainer) : 
             }
             if (added.isEmpty()) throw FileNotFoundException()
             val keep = if (kind.multipleInputs) _state.value.inputs else emptyList()
-            _state.update { it.copy(inputs = keep + added) }
+            _state.update { it.copy(inputs = (keep + added).take(kind.maxInputs)) }
             if (!kind.multipleInputs) added.firstOrNull()?.let { prepareSingle(it) }
         }
     }
@@ -167,8 +147,9 @@ class ToolsViewModel(val kind: ToolKind, private val container: AppContainer) : 
         _state.update { it.copy(pageCount = pages, pageOrder = List(pages) { index -> index }, selectedPage = 0) }
     }
 
-    fun removeInput(index: Int) = _state.update { state ->
-        state.copy(inputs = state.inputs.filterIndexed { i, _ -> i != index })
+    fun removeInput(index: Int) {
+        _state.value.inputs.getOrNull(index)?.let { temp.deleteOwnCache(it.uri) }
+        _state.update { state -> state.copy(inputs = state.inputs.filterIndexed { i, _ -> i != index }) }
     }
 
     fun moveInput(index: Int, step: Int) = _state.update { it.copy(inputs = it.inputs.moved(index, step)) }
@@ -198,142 +179,53 @@ class ToolsViewModel(val kind: ToolKind, private val container: AppContainer) : 
 
     fun newScanFile(): File = temp.newFile(".jpg").also(temps::add)
 
-    fun runMerge() = produce("merged", PDF_MIME) { out ->
-        val inputs = _state.value.inputs
-        val total = inputs.size * 2
-        val files = inputs.mapIndexed { index, input ->
-            step(index, total)
-            temp.copy(input.uri, ".pdf", input.size).also(temps::add)
-        }
-        tools.merge(files, out) { done, _ -> step(inputs.size + done, total) }
-        null
+    /** Scanner ki photos app ke cache me rehti hain. PDF ban jaye ya screen band ho, tab woh bhi jaani chahiye. */
+    private fun deleteScannerCopies() {
+        _state.value.inputs.forEach { temp.deleteOwnCache(it.uri) }
     }
 
-    fun runPhotos() = produce(if (kind == ToolKind.Scan) "" else "photos", PDF_MIME) { out ->
-        val resolver = container.contentResolver
-        step(0, 1)
-        tools.photosToPdf(_state.value.inputs.map { input -> { resolver.openInputStream(input.uri) } }, out, ::step)
-        null
-    }
+    /**
+     * Tool ka kaam chalata hai. Nateeja ek file ho to use asli naam milta hai, jaise `bill-small.pdf`.
+     * Cancel ya galti par is kaam ki har file mit jati hai.
+     */
+    internal fun run(runner: ToolRunner) = launchWork {
+        val made = CopyOnWriteArrayList<File>()
+        val files = object : ToolFiles {
+            override fun newFile(extension: String) = temp.newFile(extension).also(::keep).also(made::add)
 
-    fun runSplit(after: Int) = launchWork {
-        val parts = splitParts(_state.value.pageCount, after) ?: throw IOException("bad split")
-        val base = safeFileBase(_state.value.inputs.firstOrNull()?.name)
-        val made = parts.map { temp.newFile(".pdf").also(temps::add) }
-        try {
-            step(0, parts.size)
-            tools.split(requireSource(), parts.map(IntRange::toList), made, ::step)
-        } catch (e: CancellationException) {
-            made.forEach(File::delete)
-            throw e
-        }
-        val files = made.mapIndexed { index, file ->
-            val named = File(file.parentFile, "$base-part-${index + 1}.pdf").also(temps::add)
-            if (file.renameTo(named)) named else file
-        }
-        _state.update { it.copy(result = ToolResult(files.first(), "$base-split", PDF_MIME, files = files)) }
-    }
+            override fun copy(input: ToolInput, extension: String) =
+                temp.copy(input.uri, extension, input.size).also(::keep).also(made::add)
 
-    fun runExtract(from: Int, to: Int) = produce("pages-$from-$to", PDF_MIME) { out ->
-        tools.rearrange(requireSource(), (from - 1 until to).toList(), out)
-        null
-    }
-
-    fun runOrganize() = produce("organized", PDF_MIME) { out ->
-        tools.rearrange(requireSource(), _state.value.pageOrder, out, _state.value.pageTurns)
-        null
-    }
-
-    fun runCompress(target: CompressTarget) = produce("small", PDF_MIME) { out ->
-        step(0, 1)
-        val result = tools.compress(requireSource(), target.bytes, out, ::step)
-        when {
-            result.alreadySmall -> R.string.compress_already_small
-            !result.hadImages -> R.string.compress_no_images
-            target != CompressTarget.Smallest && !result.reachedTarget -> R.string.compress_missed
-            else -> null
-        }
-    }
-
-    fun runLock(password: String) = produce("locked", PDF_MIME) { out ->
-        tools.lock(requireSource(), password, out)
-        null
-    }
-
-    fun runUnlock(password: String) = produce("unlocked", PDF_MIME) { out ->
-        if (tools.unlock(requireSource(), password, out)) null else R.string.unlock_not_locked
-    }
-
-    fun runText() = produce("text", TEXT_MIME, ".txt") { out ->
-        step(0, 1)
-        if (tools.extractText(requireSource(), out, ::step)) null else R.string.text_none_found
-    }
-
-    fun runWordToPdf() = produce("", PDF_MIME) { out ->
-        DocumentLoader(temp::newFile).load(requireSource()).use { document ->
-            val lost = DocumentPdfWriter(document.images, ::step).write(document.parsed, out)
-            if (lost) R.string.convert_some_skipped else null
-        }
-    }
-
-    fun runTextToPdf() = produce("", PDF_MIME) { out ->
-        val source = requireSource()
-        if (source.length() > MAX_TEXT_BYTES) throw SafeZip.TooBig()
-        val lines = TextDecoder.decode(source.readBytes()).lineSequence()
-        val blocks = lines.map { DocBlock.Paragraph(AnnotatedString(it)) }.toList()
-        DocumentPdfWriter(null, ::step).write(ParsedDocument(blocks), out)
-        null
-    }
-
-    fun runPdfToWord() = produce("", DOCX_MIME, ".docx") { out ->
-        val result = PdfToWord(tools) { temp.newFile(".xml").also(temps::add) }
-            .convert(requireSource(), out, { pageImage(it, WORD_PICTURE_DPI) }, ::step)
-        when {
-            result.pictures > 0 -> R.string.word_some_pictures
-            result.lostImages -> R.string.convert_some_skipped
-            else -> null
-        }
-    }
-
-    fun runShrinkPhoto(target: PhotoTarget) = produce("small", JPEG_MIME, ".jpg") { out ->
-        val input = _state.value.inputs.firstOrNull() ?: throw IOException("no input")
-        val resolver = container.contentResolver
-        // Dobara JPEG banane se chhoti photo badi ho sakti hai, aur saaf bhi kam hoti hai.
-        if (input.size in 1..target.bytes && resolver.getType(input.uri) == JPEG_MIME) {
-            val source = resolver.openInputStream(input.uri) ?: throw FileNotFoundException()
-            source.use { stream -> out.outputStream().use { stream.copyTo(it, COPY_BUFFER) } }
-            R.string.compress_already_small
-        } else {
-            val reached = shrinkPhoto({ resolver.openInputStream(input.uri) }, target.bytes, out)
-            if (reached) null else R.string.compress_missed
-        }
-    }
-
-    fun runImages() = launchWork {
-        val pages = _state.value.pageCount
-        val base = safeFileBase(_state.value.inputs.firstOrNull()?.name)
-        val files = mutableListOf<File>()
-        try {
-            step(0, pages)
-            pipeline((0 until pages).toList(), IMAGE_WORKERS, { writePageImage(it, base) }) { index, file ->
-                files += file
-                step(index + 1, pages)
+            override fun track(file: File) {
+                keep(file)
+                made += file
             }
-        } catch (e: CancellationException) {
-            files.forEach(File::delete)
-            throw e
         }
-        val name = files.singleOrNull()?.name ?: "$base-images"
-        _state.update { it.copy(result = ToolResult(files.first(), name, JPEG_MIME, files = files)) }
+        val snapshot = _state.value
+        val base = kind.fixedName ?: safeFileBase(snapshot.inputs.firstOrNull()?.name)
+        val job = ToolJob(snapshot, base, tools, container.contentResolver, sourceFile, files, ::pageImage)
+        var finished = false
+        val output = try {
+            runner.run(job, ::step).also { finished = true }
+        } finally {
+            if (!finished) made.forEach(File::delete)
+        }
+        val single = output.files.singleOrNull()
+        val result = if (single != null && output.name == null) {
+            val tail = if (runner.suffix.isEmpty()) "" else "-${runner.suffix}"
+            val named = job.named(single, "$base$tail${runner.extension}")
+            val before = if (kind.comparesSize) snapshot.inputs.sumOf { it.size } else 0L
+            ToolResult(named, named.name, runner.mime, output.note, before)
+        } else {
+            val first = output.files.firstOrNull() ?: throw IOException("nothing made")
+            ToolResult(first, output.name ?: first.name, runner.mime, output.note, files = output.files)
+        }
+        AppLog.i(LogTag.OPEN) { "tool=$kind done size=${result.totalSize}" }
+        _state.update { it.copy(result = result) }
     }
 
-    private fun writePageImage(page: Int, base: String): File {
-        val bitmap = pageImage(page, IMAGE_DPI) ?: throw IOException("unreadable page")
-        val file = temp.newFile(".jpg").also(temps::add)
-        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
-        bitmap.recycle()
-        val named = File(file.parentFile, "$base-page-${page + 1}.jpg").also(temps::add)
-        return if (file.renameTo(named)) named else file
+    private fun keep(file: File) {
+        temps += file
     }
 
     /** Cancel dabane par agle page se pehle hi kaam rukta hai. */
@@ -345,27 +237,6 @@ class ToolsViewModel(val kind: ToolKind, private val container: AppContainer) : 
 
     fun cancelWork() {
         running?.cancel()
-    }
-
-    private fun requireSource(): File = sourceFile ?: throw IOException("no input")
-
-    private fun produce(suffix: String, mime: String, extension: String = ".pdf", work: (File) -> Int?) = launchWork {
-        val work1 = temp.newFile(extension).also(temps::add)
-        val note = try {
-            work(work1)
-        } catch (e: CancellationException) {
-            work1.delete()
-            throw e
-        }
-        val first = _state.value.inputs.firstOrNull()
-        // Camera ki photo ka naam temp file ka hota hai, woh user ko nahi dikhana.
-        val base = if (kind == ToolKind.Scan) "scan" else safeFileBase(first?.name)
-        val name = if (suffix.isEmpty()) "$base$extension" else "$base-$suffix$extension"
-        val named = File(work1.parentFile, name).also(temps::add)
-        val out = if (work1.renameTo(named)) named else work1
-        val before = if (kind.comparesSize) _state.value.inputs.sumOf { it.size } else 0L
-        AppLog.i(LogTag.OPEN) { "tool=$kind done size=${out.length()}" }
-        _state.update { it.copy(result = ToolResult(out, name, mime, note, before)) }
     }
 
     /** Files par kaam background me. Har expected galti saaf message banti hai. */
@@ -506,5 +377,6 @@ class ToolsViewModel(val kind: ToolKind, private val container: AppContainer) : 
             closeRenderer()
         }
         temps.forEach(File::delete)
+        deleteScannerCopies()
     }
 }

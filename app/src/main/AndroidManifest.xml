@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Docsy pura offline hai. Google scanner ki library apni usage report bhejne ke liye internet maangti hai;
+        scanner khud Play Services me chalta hai, isliye bina internet ke bhi poora kaam karta hai.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
     <application
         android:name=".KholoApp"
@@ -71,6 +79,12 @@
         <activity
             android:name=".tools.ToolsActivity"
             android:exported="false" />
+
+        <!-- ML Kit app khulte hi init hota tha. Ab sirf scanner kholne par: dekho SmartScanner. -->
+        <provider
+            android:name="com.google.mlkit.common.internal.MlKitInitProvider"
+            android:authorities="${applicationId}.mlkitinitprovider"
+            tools:node="remove" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

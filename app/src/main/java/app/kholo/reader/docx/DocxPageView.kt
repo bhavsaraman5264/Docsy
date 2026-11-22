@@ -48,11 +48,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.kholo.reader.R
+import app.kholo.reader.pdf.MIN_SCROLLER_PAGES
+import app.kholo.reader.ui.components.ListScroller
+import app.kholo.reader.ui.components.PageJump
 import app.kholo.reader.ui.components.highlighted
 import app.kholo.reader.ui.theme.LocalReaderBackground
 import kotlin.math.roundToInt
@@ -144,6 +149,9 @@ fun DocxPageView(document: ParsedDocument, viewModel: DocxViewModel, modifier: M
                     }
                 }
             }
+        }
+        ListScroller(list, loaded.size, minItems = MIN_SCROLLER_PAGES, jump = PageJump) {
+            stringResource(R.string.page_indicator, it + 1, loaded.size)
         }
     }
 }

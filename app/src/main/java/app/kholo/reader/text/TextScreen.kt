@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
@@ -33,11 +34,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import app.kholo.reader.R
 import app.kholo.reader.core.AppContainer
 import app.kholo.reader.core.LoadState
-import app.kholo.reader.table.FastScrollbar
 import app.kholo.reader.ui.components.FindAction
 import app.kholo.reader.ui.components.FindRange
+import app.kholo.reader.ui.components.ListScroller
 import app.kholo.reader.ui.components.highlighted
 import app.kholo.reader.ui.components.pinchFontSize
 import app.kholo.reader.ui.theme.Spacing
@@ -108,7 +110,10 @@ fun TextScreen(uri: Uri, name: String, container: AppContainer, actions: ReaderA
                         }
                     }
                 }
-                FastScrollbar(list, current.value.chunkCount, Modifier.align(Alignment.CenterEnd))
+                val chunks = current.value.chunkCount
+                ListScroller(list, chunks) {
+                    stringResource(R.string.scroll_percent, it * 100 / (chunks - 1).coerceAtLeast(1))
+                }
             }
         }
     }

@@ -4,8 +4,17 @@ import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.foundation.gestures.TargetedFlingBehavior
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -35,6 +44,7 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabPosition
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,19 +60,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kholo.reader.R
 import app.kholo.reader.recents.RecentFile
@@ -76,6 +93,11 @@ import app.kholo.reader.ui.components.PrimaryAction
 import app.kholo.reader.ui.theme.FavoriteStar
 import app.kholo.reader.ui.theme.LocalBarColors
 import app.kholo.reader.ui.theme.Spacing
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlinx.coroutines.launch
 
 /** Tabs turant neeche hain, isliye bar chhota. Touch target phir bhi 48dp rehta hai. */
@@ -93,8 +115,20 @@ private val DRAWER_PULL = 48.dp
 /** Itni tez chhoti flick bhi menu khole, chahe [DRAWER_PULL] tak na pahunchi ho. Dp prati second. */
 private val DRAWER_FLICK = 600.dp
 
-/** Page ka itna hissa khinchne par tab badle. Default aadha hai, jo bhaari lagta hai. */
-private const val TAB_SWITCH_THRESHOLD = 0.3f
+/** Page ka itna hissa dheere khinchne par tab badle. Default aadha hai, jo bhaari lagta hai. */
+private const val TAB_SWITCH_THRESHOLD = 0.25f
+
+/** Itni halki flick bhi tab badle. Dp prati second. */
+private val LIGHT_FLICK = 150.dp
+
+/** Compose isse dheemi flick ko flick nahi maanta aur page wapas bhej deta hai. Library me yahi had hai. */
+private val PAGER_FLICK = 400.dp
+
+/**
+ * Tab dabane par seedha aur chhota slide. Pager ki default spring dheere ruki, aur Recent se Tools tak
+ * beech wale tab se guzarte hue atki hui lagti thi.
+ */
+private val TAB_TAP_ANIMATION = tween<Float>(durationMillis = 280, easing = FastOutSlowInEasing)
 
 private const val JUST_NOW_MS = 60_000L
 private const val FILE_ROW = "file"
@@ -123,10 +157,10 @@ fun HomeScreen(
     val drawerPull = remember(drawer, pullPx, flickPx) {
         DrawerPull(pullPx, flickPx) { scope.launch { drawer.open() } }
     }
-    // Sirf button ke andar padha jata hai, taaki swipe ke beech poori screen dobara na bane.
+    // Swipe poora hone ke baad hi badalta hai. Beech me button aane-jaane se poori screen dobara naapi jati thi.
     val hasFiles by remember(state.recents, state.favorites) {
         derivedStateOf {
-            when (HomeTab.entries[pager.currentPage]) {
+            when (HomeTab.entries[pager.settledPage]) {
                 HomeTab.Recent -> state.recents.isNotEmpty()
                 HomeTab.Favorites -> state.favorites.isNotEmpty()
                 HomeTab.Tools -> false
@@ -160,13 +194,20 @@ fun HomeScreen(
                 }
             },
             floatingActionButton = {
-                if (!window.isShortHeight && hasFiles) {
+                // Tab badalne ke baad button achanak na aaye-jaye: wahi ek bhaari frame jhatka lagta tha.
+                AnimatedVisibility(
+                    visible = !window.isShortHeight && hasFiles,
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut(),
+                ) {
                     PrimaryAction(stringResource(R.string.action_open_file), onPickFile)
                 }
             },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
-                HomeTabs(pager) { scope.launch { pager.animateScrollToPage(it.ordinal) } }
+                HomeTabs(pager) {
+                    scope.launch { pager.animateScrollToPage(it.ordinal, animationSpec = TAB_TAP_ANIMATION) }
+                }
                 HorizontalPager(
                     state = pager,
                     modifier = Modifier
@@ -180,19 +221,24 @@ fun HomeScreen(
                         .nestedScroll(drawerPull),
                     // Teeno tabs pehle se bane rehte hain, isliye swipe ke beech kuch naya nahi banta.
                     beyondViewportPageCount = HomeTab.entries.size - 1,
-                    flingBehavior = PagerDefaults.flingBehavior(
-                        state = pager,
-                        snapAnimationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        snapPositionalThreshold = TAB_SWITCH_THRESHOLD,
+                    flingBehavior = lightFlick(
+                        PagerDefaults.flingBehavior(
+                            state = pager,
+                            snapAnimationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            snapPositionalThreshold = TAB_SWITCH_THRESHOLD,
+                        ),
                     ),
                 ) { page ->
-                    when (val shown = HomeTab.entries[page]) {
-                        HomeTab.Tools -> ToolGrid(onTool)
-                        HomeTab.Recent -> FilePage(shown, state.recents, recentList, onPickFile) {
-                            RecentRow(it, onOpen, onShare, viewModel)
-                        }
-                        HomeTab.Favorites -> FilePage(shown, state.favorites, favoriteList, onPickFile) {
-                            RecentRow(it, onOpen, onShare, viewModel)
+                    // Har tab apni alag layer par: swipe me page sirf khiskta hai, dobara draw nahi hota.
+                    Box(Modifier.fillMaxSize().graphicsLayer {}) {
+                        when (val shown = HomeTab.entries[page]) {
+                            HomeTab.Tools -> ToolGrid(onTool)
+                            HomeTab.Recent -> FilePage(shown, state.recents, recentList, onPickFile) {
+                                RecentRow(it, onOpen, onShare, viewModel)
+                            }
+                            HomeTab.Favorites -> FilePage(shown, state.favorites, favoriteList, onPickFile) {
+                                RecentRow(it, onOpen, onShare, viewModel)
+                            }
                         }
                     }
                 }
@@ -237,6 +283,29 @@ private fun FilePage(
             contentPadding = PaddingValues(bottom = LIST_BOTTOM_PADDING),
         ) {
             items(files, key = { it.uri }, contentType = { FILE_ROW }) { row(it) }
+        }
+    }
+}
+
+/**
+ * Halki flick par bhi tab badle. Compose 400 dp/s se dheemi flick ko flick nahi maanta, isliye chhoti tez
+ * flick wapas usi tab par laut jaati thi. Aisi flick ko us had tak badha dete hain. Bilkul ruki ungli par kuch nahi.
+ */
+@Composable
+private fun lightFlick(base: TargetedFlingBehavior): TargetedFlingBehavior {
+    val density = LocalDensity.current
+    return remember(base, density) {
+        val light = with(density) { LIGHT_FLICK.toPx() }
+        val flick = with(density) { PAGER_FLICK.toPx() } + 1f
+        object : TargetedFlingBehavior {
+            override suspend fun ScrollScope.performFling(
+                initialVelocity: Float,
+                onRemainingDistanceUpdated: (Float) -> Unit,
+            ): Float {
+                val speed = abs(initialVelocity)
+                val velocity = if (speed >= light && speed < flick) flick * sign(initialVelocity) else initialVelocity
+                return with(base) { performFling(velocity, onRemainingDistanceUpdated) }
+            }
         }
     }
 }
@@ -397,14 +466,17 @@ private fun fileSubtitle(file: RecentFile): String {
 @Composable
 private fun HomeTabs(pager: PagerState, onSelect: (HomeTab) -> Unit) {
     val bar = LocalBarColors.current
-    val selected = HomeTab.entries[pager.currentPage]
+    // Tap karte hi naya tab chuna hua dikhe, aadhe raste par nahi.
+    val selected = HomeTab.entries[pager.targetPage]
     PrimaryTabRow(
         selectedTabIndex = selected.ordinal,
         containerColor = bar.container,
         contentColor = bar.content,
         indicator = {
             TabRowDefaults.PrimaryIndicator(
-                modifier = Modifier.tabIndicatorOffset(selected.ordinal, matchContentSize = true),
+                modifier = Modifier.tabIndicatorLayout { measurable, constraints, tabs ->
+                    followPager(pager, measurable, constraints, tabs)
+                },
                 width = Dp.Unspecified,
                 color = bar.content,
             )
@@ -421,6 +493,30 @@ private fun HomeTabs(pager: PagerState, onSelect: (HomeTab) -> Unit) {
             )
         }
     }
+}
+
+/**
+ * Line ungli ke saath chalti hai. Pehle woh aadhe swipe tak rukti thi aur phir koodti thi,
+ * jisse swipe atka hua lagta tha.
+ * Pager ki jagah sirf yahan, layout me padhi jati hai, isliye har frame par sirf yeh line khisakti hai.
+ */
+private fun MeasureScope.followPager(
+    pager: PagerState,
+    measurable: Measurable,
+    constraints: Constraints,
+    tabs: List<TabPosition>,
+): MeasureResult {
+    if (tabs.isEmpty()) return layout(0, 0) {}
+    val spot = (pager.currentPage + pager.currentPageOffsetFraction).coerceIn(0f, tabs.lastIndex.toFloat())
+    val from = tabs[floor(spot).toInt()]
+    val to = tabs[ceil(spot).toInt()]
+    val share = spot - floor(spot)
+    val width = lerp(from.contentWidth, to.contentWidth, share).roundToPx()
+    val center = lerp(from.left + from.width / 2, to.left + to.width / 2, share).toPx()
+    val line = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    val rowWidth = (tabs.last().left + tabs.last().width).toPx()
+    val x = if (layoutDirection == LayoutDirection.Ltr) center - width / 2f else rowWidth - center - width / 2f
+    return layout(constraints.maxWidth, line.height) { line.place(x.roundToInt(), 0) }
 }
 
 private fun HomeTab.label(): Int = when (this) {

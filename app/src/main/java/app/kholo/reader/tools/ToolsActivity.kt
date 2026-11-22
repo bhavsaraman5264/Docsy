@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,7 +30,9 @@ import app.kholo.reader.KholoApp
 import app.kholo.reader.R
 import app.kholo.reader.ViewerActivity
 import app.kholo.reader.core.file.COPY_BUFFER
+import app.kholo.reader.scan.SmartScanner
 import app.kholo.reader.settings.LanguageStore
+import app.kholo.reader.ui.adaptive.preferHighRefreshRate
 import app.kholo.reader.ui.theme.AppTheme
 import java.io.File
 import java.io.IOException
@@ -38,9 +41,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val EXTRA_TOOL = "tool"
-private const val MAX_PHOTOS = 50
 
-/** Har tool isi Activity me chalta hai. Camera ki permission nahi lagti, photo system camera app leta hai. */
+/**
+ * Har tool isi Activity me chalta hai. Camera ki permission nahi lagti: photo Google ka scanner ya system ki camera
+ * app leti hai.
+ */
 class ToolsActivity : ComponentActivity() {
     private val authority: String get() = "$packageName.files"
 
@@ -51,6 +56,7 @@ class ToolsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        preferHighRefreshRate()
         val kind = ToolKind.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_TOOL) } ?: ToolKind.Merge
         val container = (application as KholoApp).container
         setContent {
@@ -72,9 +78,32 @@ class ToolsActivity : ComponentActivity() {
                 val pickPhotos = rememberLauncherForActivityResult(
                     ActivityResultContracts.PickMultipleVisualMedia(MAX_PHOTOS),
                 ) { viewModel.addInputs(it) }
+                val pickCardSides = rememberLauncherForActivityResult(
+                    ActivityResultContracts.PickMultipleVisualMedia(ID_CARD_SIDES),
+                ) { viewModel.addInputs(it) }
                 val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
                     val uri = scanUri
                     if (taken && uri != null) viewModel.addInputs(listOf(uri))
+                }
+                val scanner = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartIntentSenderForResult(),
+                ) { result -> viewModel.addInputs(SmartScanner.pages(result.data)) }
+                val takePhoto: () -> Unit = {
+                    val uri = FileProvider.getUriForFile(this, authority, viewModel.newScanFile())
+                    scanUri = uri
+                    try {
+                        camera.launch(uri)
+                    } catch (_: ActivityNotFoundException) {
+                        toast(R.string.error_no_app)
+                    }
+                }
+                // Scanner na mile to Scan me camera, aur ID card me gallery: card ki photo aksar pehle se hoti hai.
+                val withoutScanner: () -> Unit = {
+                    if (kind == ToolKind.IdCard) {
+                        pickCardSides.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    } else {
+                        takePhoto()
+                    }
                 }
                 val saver = rememberLauncherForActivityResult(CreateDocumentAny()) { uri ->
                     // ViewModel se, kyunki file picker ke beech phone ghume to Activity nayi hoti hai.
@@ -92,15 +121,11 @@ class ToolsActivity : ComponentActivity() {
                         ToolKind.Photos -> pickPhotos.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                         )
-                        ToolKind.Scan -> {
-                            val uri = FileProvider.getUriForFile(this, authority, viewModel.newScanFile())
-                            scanUri = uri
-                            try {
-                                camera.launch(uri)
-                            } catch (_: ActivityNotFoundException) {
-                                toast(R.string.error_no_app)
-                            }
-                        }
+                        ToolKind.Scan, ToolKind.IdCard -> SmartScanner(this).start(
+                            pageLimit = kind.maxInputs - viewModel.state.value.inputs.size,
+                            onReady = { scanner.launch(IntentSenderRequest.Builder(it).build()) },
+                            onUnavailable = withoutScanner,
+                        )
                         ToolKind.ShrinkPhoto -> pickPhoto.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                         )

@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -27,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntRect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -37,6 +39,7 @@ import app.kholo.reader.report.ReportScreen
 import app.kholo.reader.settings.LanguageStore
 import app.kholo.reader.settings.SettingsScreen
 import app.kholo.reader.tools.ToolsActivity
+import app.kholo.reader.ui.adaptive.preferHighRefreshRate
 import app.kholo.reader.ui.components.IntroPage
 import app.kholo.reader.ui.components.SwipeBack
 import app.kholo.reader.ui.theme.AppTheme
@@ -68,6 +71,9 @@ internal val OPEN_TYPES = arrayOf(
 class MainActivity : ComponentActivity() {
     private val container: AppContainer get() = (application as KholoApp).container
 
+    /** Launch screen ke logo ki jagah, taaki intro page ka logo theek wahin bane. */
+    private var splashIcon by mutableStateOf<IntRect?>(null)
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LanguageStore.wrap(newBase))
     }
@@ -75,6 +81,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        preferHighRefreshRate()
+        handOverSplash()
         // PDF engine alag process me chalta hai. Screen dikhne ke baad warm karo, taaki app ka start dhima na ho.
         window.decorView.postDelayed(container::warmPdfEngine, PDF_WARMUP_DELAY_MS)
         val startCategory = intent.getStringExtra(EXTRA_REPORT_CATEGORY)
@@ -144,10 +152,27 @@ class MainActivity : ComponentActivity() {
                         enter = EnterTransition.None,
                         exit = fadeOut(tween(INTRO_FADE_MS)),
                     ) {
-                        IntroPage()
+                        IntroPage(splashIcon)
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Android 12 se launch screen apna logo khud banati hai. Uski jagah padh kar intro page ko dete hain, aur jab
+     * intro usi jagah logo bana leta hai tab launch screen hatate hain. Dono ek jaise hain, isliye badlav dikhta nahi.
+     */
+    private fun handOverSplash() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        splashScreen.setOnExitAnimationListener { splash ->
+            splashIcon = splash.iconView?.takeIf { it.width > 0 }?.let { icon ->
+                val spot = IntArray(2).also(icon::getLocationInWindow)
+                IntRect(spot[0], spot[1], spot[0] + icon.width, spot[1] + icon.height)
+            }
+            // Ek frame Compose ke naye logo ke liye, ek uske screen par aane ke liye. Phir launch screen hatao.
+            val root = window.decorView
+            root.postOnAnimation { root.postOnAnimation { splash.remove() } }
         }
     }
 

@@ -99,6 +99,8 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.androidx.core)
     implementation(libs.pdfbox.android)
+    // Scanner Google Play Services me chalta hai. App me sirf ~300 KB ka client judta hai.
+    implementation(libs.mlkit.document.scanner)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

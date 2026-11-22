@@ -1,7 +1,6 @@
 package app.kholo.reader.tools
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.core.graphics.scale
@@ -19,7 +18,6 @@ import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.text.PDFTextStripper
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -52,8 +50,6 @@ typealias ToolProgress = (done: Int, total: Int) -> Unit
 private val NO_PROGRESS: ToolProgress = { _, _ -> }
 
 class CompressResult(val reachedTarget: Boolean, val hadImages: Boolean, val alreadySmall: Boolean = false)
-
-private class EncodedPhoto(val jpeg: ByteArray, val width: Int, val height: Int)
 
 /** PDF banane wale ne yeh badlav mana kiya hai. Password yahan khali hota hai, isliye file khul jati hai. */
 class PdfRestricted : IOException()
@@ -98,6 +94,38 @@ class PdfTools(context: Context, private val scratchDir: File) {
         if (!isEncrypted) return
         if (!check(currentAccessPermission)) throw PdfRestricted()
         isAllSecurityToBeRemoved = true
+    }
+
+    /** Nayi PDF banane wale tools ke liye, jaise ID card ki copy. */
+    fun create(out: File, block: (PDDocument) -> Unit) {
+        ensureReady()
+        PDDocument(memory()).use { doc ->
+            block(doc)
+            doc.save(out)
+        }
+    }
+
+    /** Har page par kuch jodne wale tools ke liye, jaise watermark. Asli file nahi badalti. */
+    fun edit(file: File, out: File, block: (PDDocument) -> Unit) {
+        open(file).use { doc ->
+            doc.allow(AccessPermission::canModify)
+            block(doc)
+            doc.save(out)
+        }
+    }
+
+    /**
+     * Page-page nayi PDF jismein asli ke page bhi aa sakte hain, jaise scan saaf karna. Asli tab tak khuli rehti
+     * hai jab tak nayi save na ho, kyunki liye gaye page usi ka data padhte hain.
+     */
+    fun rebuild(file: File, out: File, block: (source: PDDocument, result: PDDocument) -> Unit) {
+        open(file).use { source ->
+            source.allow(AccessPermission::canModify)
+            PDDocument(memory()).use { result ->
+                block(source, result)
+                result.save(out)
+            }
+        }
     }
 
     /** Convert tools ke liye: PDF khul kar kaam hote hi band ho jati hai. */
@@ -173,7 +201,7 @@ class PdfTools(context: Context, private val scratchDir: File) {
     ) {
         ensureReady()
         PDDocument(memory()).use { doc ->
-            pipeline(photos, workers, ::encodePhoto) { index, photo ->
+            pipeline(photos, workers, { encodePhoto(it, PHOTO_QUALITY) }) { index, photo ->
                 val image = JPEGFactory.createFromByteArray(doc, photo.jpeg)
                 val box = fitPage(photo.width, photo.height)
                 val page = PDPage(box)
@@ -183,16 +211,6 @@ class PdfTools(context: Context, private val scratchDir: File) {
             }
             doc.save(out)
         }
-    }
-
-    private fun encodePhoto(source: () -> InputStream?): EncodedPhoto {
-        val decoded = loadPhoto(source) ?: throw IOException("unreadable photo")
-        val photo = decoded.flattened()
-        val jpeg = ByteArrayOutputStream().also { photo.compress(Bitmap.CompressFormat.JPEG, PHOTO_QUALITY, it) }
-        val encoded = EncodedPhoto(jpeg.toByteArray(), photo.width, photo.height)
-        if (photo !== decoded) decoded.recycle()
-        photo.recycle()
-        return encoded
     }
 
     /** Photo ko A4 ki chaudai par laate hain, taaki PDF print par sahi aaye. Bahut lambi photo chhoti hoti hai. */

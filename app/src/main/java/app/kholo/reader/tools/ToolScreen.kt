@@ -285,23 +285,24 @@ private fun PickPrompt(kind: ToolKind, onPick: () -> Unit, modifier: Modifier) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                painterResource(if (kind == ToolKind.Scan) R.drawable.ic_camera else R.drawable.ic_add),
+                painterResource(if (kind.usesScanner) R.drawable.ic_camera else R.drawable.ic_add),
                 contentDescription = null,
                 modifier = Modifier.size(PICK_ICON),
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
         Text(
-            text = stringResource(if (kind == ToolKind.Scan) R.string.tool_add_page else R.string.tool_pick_file),
+            text = stringResource(pickLabel(kind)),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
         )
     }
 }
 
-internal fun pickLabel(kind: ToolKind): Int = when {
+internal fun pickLabel(kind: ToolKind, hasInputs: Boolean = false): Int = when {
     kind == ToolKind.Scan -> R.string.tool_add_page
-    kind.multipleInputs -> R.string.tool_add_more
+    kind == ToolKind.IdCard -> if (hasInputs) R.string.id_card_add_side else R.string.id_card_scan
+    kind.multipleInputs && hasInputs -> R.string.tool_add_more
     else -> R.string.tool_pick_file
 }
 

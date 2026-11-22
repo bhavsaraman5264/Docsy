@@ -7,31 +7,14 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.media.ExifInterface
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.IOException
 import java.io.InputStream
 
 private const val MAX_PHOTO_SIDE = 2200
-private const val PERCENT = 100
 internal const val FULL_TURN = 360
 internal const val QUARTER_TURN = 90
 private const val HALF_TURN = 180
-
-/** Pehle sirf quality ghatti hai, phir size. Target milte hi ruk jate hain, taaki photo jitni ho sake saaf rahe. */
-private val SHRINK_STEPS = listOf(
-    1f to 0.85f,
-    1f to 0.7f,
-    0.8f to 0.7f,
-    0.65f to 0.65f,
-    0.5f to 0.6f,
-    0.4f to 0.55f,
-    0.3f to 0.5f,
-    0.2f to 0.45f,
-    0.15f to 0.4f,
-    0.1f to 0.35f,
-)
 
 /** Photo ko sahi disha me, [maxSide] tak chhoti karke padhta hai. */
 internal fun loadPhoto(source: () -> InputStream?, maxSide: Int = MAX_PHOTO_SIDE): Bitmap? {
@@ -69,23 +52,17 @@ internal fun Bitmap.flattened(): Bitmap {
     return flat
 }
 
-/** Form ke liye photo chhoti karta hai. False ka matlab target tak nahi pahunchi, aur sabse chhoti file di gayi. */
-fun shrinkPhoto(source: () -> InputStream?, targetBytes: Long, out: File): Boolean {
-    val photo = loadPhoto(source)?.flattened() ?: throw IOException("unreadable photo")
-    var best: ByteArray? = null
-    for ((scale, quality) in SHRINK_STEPS) {
-        val width = (photo.width * scale).toInt().coerceAtLeast(1)
-        val height = (photo.height * scale).toInt().coerceAtLeast(1)
-        val sized = if (scale < 1f) photo.scale(width, height) else photo
-        val bytes = ByteArrayOutputStream().also {
-            sized.compress(Bitmap.CompressFormat.JPEG, (quality * PERCENT).toInt(), it)
-        }.toByteArray()
-        if (sized !== photo) sized.recycle()
-        if (bytes.size < (best?.size ?: Int.MAX_VALUE)) best = bytes
-        if (bytes.size <= targetBytes) break
+internal class EncodedPhoto(val jpeg: ByteArray, val width: Int, val height: Int)
+
+/** PDF me lagane ke liye photo ka JPEG. Bitmap yahin mit jata hai, sirf bytes bachte hain. */
+internal fun encodePhoto(source: () -> InputStream?, quality: Int, maxSide: Int = MAX_PHOTO_SIDE): EncodedPhoto {
+    val decoded = loadPhoto(source, maxSide) ?: throw IOException("unreadable photo")
+    val photo = decoded.flattened()
+    if (photo !== decoded) decoded.recycle()
+    return try {
+        val jpeg = ByteArrayOutputStream().also { photo.compress(Bitmap.CompressFormat.JPEG, quality, it) }
+        EncodedPhoto(jpeg.toByteArray(), photo.width, photo.height)
+    } finally {
+        photo.recycle()
     }
-    photo.recycle()
-    val smallest = best ?: throw IOException("nothing written")
-    out.writeBytes(smallest)
-    return smallest.size <= targetBytes
 }

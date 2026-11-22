@@ -5,8 +5,6 @@ import androidx.annotation.StringRes
 import app.kholo.reader.R
 import app.kholo.reader.ui.theme.ToolTone
 
-private const val PDF_MIME = "application/pdf"
-private const val DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 private const val DOC_MIME = "application/msword"
 
 /** Kuch file managers Word file ko sirf "binary" batate hain. Asli pehchan file ke bytes se hoti hai. */
@@ -40,6 +38,8 @@ enum class ToolKind(
     Lock(R.string.tool_lock, R.string.tool_lock_hint, R.drawable.ic_lock, ToolGroup.Pdf),
     Unlock(R.string.tool_unlock, R.string.tool_unlock_hint, R.drawable.ic_lock_open, ToolGroup.Pdf),
     Organize(R.string.tool_organize, R.string.tool_organize_hint, R.drawable.ic_swap, ToolGroup.Pdf),
+    Watermark(R.string.tool_watermark, R.string.tool_watermark_hint, R.drawable.ic_watermark, ToolGroup.Pdf),
+    PageNumbers(R.string.tool_page_numbers, R.string.tool_page_numbers_hint, R.drawable.ic_numbers, ToolGroup.Pdf),
     PdfToWord(R.string.tool_pdf_to_word, R.string.tool_pdf_to_word_hint, R.drawable.ic_description, ToolGroup.Convert),
     WordToPdf(
         R.string.tool_word_to_pdf,
@@ -57,6 +57,19 @@ enum class ToolKind(
     ),
     Text(R.string.tool_text, R.string.tool_text_hint, R.drawable.ic_description, ToolGroup.Convert),
     Scan(R.string.tool_scan, R.string.tool_scan_hint, R.drawable.ic_camera, ToolGroup.Photo, ToolInputType.Image),
+    CleanScan(
+        R.string.tool_clean_scan,
+        R.string.tool_clean_scan_hint,
+        R.drawable.ic_clean,
+        ToolGroup.Photo,
+    ),
+    IdCard(
+        R.string.tool_id_card,
+        R.string.tool_id_card_hint,
+        R.drawable.ic_id_card,
+        ToolGroup.Photo,
+        ToolInputType.Image,
+    ),
     Photos(
         R.string.tool_photos,
         R.string.tool_photos_hint,
@@ -74,7 +87,26 @@ enum class ToolKind(
     ),
     ;
 
-    val multipleInputs: Boolean get() = this == Photos || this == Scan || this == Merge
+    val multipleInputs: Boolean get() = this == Photos || this == Scan || this == Merge || this == IdCard
+
+    /** ID card ke do hi hisse hain. Photos me bhi had hai, taaki 500 photo ek saath memory me na aayen. */
+    val maxInputs: Int
+        get() = when (this) {
+            IdCard -> ID_CARD_SIDES
+            Photos, Scan -> MAX_PHOTOS
+            else -> Int.MAX_VALUE
+        }
+
+    /** Camera ya scanner ki photo ka naam temp file ka hota hai, woh user ko nahi dikhana. */
+    val fixedName: String?
+        get() = when (this) {
+            Scan -> "scan"
+            IdCard -> "id-card"
+            else -> null
+        }
+
+    /** Google ka scanner kinare kaat kar page seedha karta hai. In tools me photo usi se aati hai, mile to. */
+    val usesScanner: Boolean get() = this == Scan || this == IdCard
 
     /** Sirf chhota karne wale tools me "pehle aur baad ka size" ka matlab hai. Baaki me file hi doosri hai. */
     val comparesSize: Boolean get() = this == Compress || this == ShrinkPhoto
@@ -97,7 +129,9 @@ enum class ToolKind(
             Merge -> ToolTone.Blue
             Organize -> ToolTone.Plum
             Lock -> ToolTone.Red
-            Unlock, Scan -> ToolTone.Green
+            Unlock, Scan, CleanScan -> ToolTone.Green
+            Watermark, PageNumbers -> ToolTone.Blue
+            IdCard -> ToolTone.Plum
             else -> ToolTone.Teal
         }
 }
@@ -113,7 +147,9 @@ internal fun sizeSavedPercent(before: Long, after: Long): Int? {
 }
 
 private const val PERCENT = 100
-private const val BYTES_50_KB = 50L * 1024
+
+/** Photo picker ek baar me isse zyada nahi deta. */
+internal const val MAX_PHOTOS = 50
 private const val BYTES_100_KB = 100L * 1024
 private const val BYTES_200_KB = 200L * 1024
 private const val BYTES_500_KB = 500L * 1024
@@ -125,11 +161,4 @@ enum class CompressTarget(val bytes: Long, @param:StringRes val label: Int) {
     Kb200(BYTES_200_KB, R.string.compress_200),
     Kb500(BYTES_500_KB, R.string.compress_500),
     Mb1(BYTES_1_MB, R.string.compress_1000),
-}
-
-/** Exam aur job forms aksar photo aur signature par 50 se 200 KB ki limit rakhte hain. */
-enum class PhotoTarget(val bytes: Long, @param:StringRes val label: Int) {
-    Kb50(BYTES_50_KB, R.string.compress_50),
-    Kb100(BYTES_100_KB, R.string.compress_100),
-    Kb200(BYTES_200_KB, R.string.compress_200),
 }

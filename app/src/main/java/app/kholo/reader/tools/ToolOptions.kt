@@ -34,40 +34,49 @@ private val OPTIONS_HEIGHT = 240.dp
 private val SHORT_OPTIONS_HEIGHT = 96.dp
 
 /** Button ke saath wala doosra kaam: aur file jodna ya file badalna. */
-private class SideAction(val label: Int, val onClick: () -> Unit)
+internal class SideAction(val label: Int, val onClick: () -> Unit)
 
 @Composable
 internal fun ToolOptions(viewModel: ToolsViewModel, state: ToolUiState, onPick: () -> Unit) {
     val kind = viewModel.kind
-    val more = if (kind.multipleInputs) SideAction(pickLabel(kind), onPick) else null
+    val canAdd = kind.multipleInputs && state.inputs.size < kind.maxInputs
+    val more = if (canAdd) SideAction(pickLabel(kind, hasInputs = true), onPick) else null
+    val run = viewModel::run
     when (kind) {
-        ToolKind.Photos, ToolKind.Scan -> ToolPanel(R.string.tool_make_pdf, viewModel::runPhotos, more)
-        ToolKind.Merge -> ToolPanel(R.string.tool_merge, viewModel::runMerge, more, state.inputs.size >= 2) {
+        ToolKind.Photos -> ToolPanel(R.string.tool_make_pdf, { run(PhotosRunner("photos")) }, more)
+        ToolKind.Scan -> ToolPanel(R.string.tool_make_pdf, { run(PhotosRunner("")) }, more)
+        ToolKind.IdCard -> ToolPanel(R.string.tool_make_pdf, { run(IdCardRunner) }, more) {
+            OptionNote(if (state.inputs.size < ID_CARD_SIDES) R.string.id_card_add_back else R.string.id_card_ready)
+        }
+        ToolKind.Merge -> ToolPanel(R.string.tool_merge, { run(MergeRunner) }, more, state.inputs.size >= 2) {
             if (state.inputs.size < 2) OptionNote(R.string.tool_merge_need_two)
         }
         ToolKind.Split -> SplitOptions(viewModel, state.pageCount)
         ToolKind.Extract -> ExtractOptions(viewModel, state.pageCount)
         ToolKind.Organize -> ToolPanel(
             label = R.string.action_save,
-            onRun = viewModel::runOrganize,
+            onRun = { run(OrganizeRunner) },
             side = SideAction(R.string.action_change, onPick),
             enabled = state.pageOrder.isNotEmpty(),
         ) { if (state.pageOrder.isNotEmpty()) PageActions(viewModel, state) }
         ToolKind.Compress -> CompressOptions(viewModel)
-        ToolKind.Lock -> PasswordOption(R.string.tool_lock, viewModel::runLock)
-        ToolKind.Unlock -> PasswordOption(R.string.tool_unlock, viewModel::runUnlock)
-        ToolKind.Text -> ToolPanel(R.string.tool_text, viewModel::runText)
-        ToolKind.PdfToWord -> ToolPanel(R.string.tool_pdf_to_word, viewModel::runPdfToWord)
-        ToolKind.WordToPdf -> ToolPanel(R.string.tool_word_to_pdf, viewModel::runWordToPdf)
-        ToolKind.TextToPdf -> ToolPanel(R.string.tool_make_pdf, viewModel::runTextToPdf)
-        ToolKind.PdfToImages -> ToolPanel(R.string.tool_pdf_to_jpg, viewModel::runImages)
-        ToolKind.ShrinkPhoto -> ShrinkOptions(viewModel)
+        ToolKind.Lock -> PasswordOption(R.string.tool_lock) { run(LockRunner(it)) }
+        ToolKind.Unlock -> PasswordOption(R.string.tool_unlock) { run(UnlockRunner(it)) }
+        ToolKind.Watermark -> WatermarkOptions(viewModel)
+        ToolKind.PageNumbers -> PageNumberOptions(viewModel)
+        ToolKind.CleanScan -> CleanScanOptions(viewModel)
+        ToolKind.Text -> ToolPanel(R.string.tool_text, { run(TextRunner) })
+        ToolKind.PdfToWord -> ToolPanel(R.string.tool_pdf_to_word, { run(PdfToWordRunner) })
+        ToolKind.WordToPdf -> ToolPanel(R.string.tool_word_to_pdf, { run(WordToPdfRunner) })
+        ToolKind.TextToPdf -> ToolPanel(R.string.tool_make_pdf, { run(TextToPdfRunner) })
+        ToolKind.PdfToImages -> ToolPanel(R.string.tool_pdf_to_jpg, { run(PdfToImagesRunner) })
+        ToolKind.ShrinkPhoto -> ExamPhotoOptions(viewModel)
     }
 }
 
 /** Keyboard ya chhoti screen par options apne andar scroll hote hain, par kaam ka button hamesha dikhta hai. */
 @Composable
-private fun ToolPanel(
+internal fun ToolPanel(
     label: Int,
     onRun: () -> Unit,
     side: SideAction? = null,
@@ -91,9 +100,12 @@ private fun ToolPanel(
 }
 
 @Composable
-private fun OptionNote(text: Int) {
+internal fun OptionNote(text: Int) = OptionNote(stringResource(text))
+
+@Composable
+internal fun OptionNote(text: String) {
     Text(
-        text = stringResource(text),
+        text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -107,7 +119,7 @@ private fun SplitOptions(viewModel: ToolsViewModel, pageCount: Int) {
     val parts = cut?.let { splitParts(pageCount, it) }
     ToolPanel(
         label = R.string.tool_split,
-        onRun = { if (cut != null) viewModel.runSplit(cut) },
+        onRun = { if (cut != null) viewModel.run(SplitRunner(cut)) },
         enabled = parts != null,
     ) {
         if (pageCount == 1) {
@@ -141,7 +153,7 @@ private fun ExtractOptions(viewModel: ToolsViewModel, pageCount: Int) {
     val valid = start != null && end != null && start in 1..end && end <= pageCount
     ToolPanel(
         label = R.string.tool_extract,
-        onRun = { if (start != null && end != null) viewModel.runExtract(start, end) },
+        onRun = { if (start != null && end != null) viewModel.run(ExtractRunner(start, end)) },
         enabled = valid,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
@@ -152,7 +164,7 @@ private fun ExtractOptions(viewModel: ToolsViewModel, pageCount: Int) {
 }
 
 @Composable
-private fun NumberField(label: Int, value: String, modifier: Modifier, onChange: (String) -> Unit) {
+internal fun NumberField(label: Int, value: String, modifier: Modifier, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = { onChange(it.filter(Char::isDigit)) },
@@ -166,21 +178,13 @@ private fun NumberField(label: Int, value: String, modifier: Modifier, onChange:
 @Composable
 private fun CompressOptions(viewModel: ToolsViewModel) {
     var target by remember { mutableStateOf(CompressTarget.Kb200) }
-    ToolPanel(R.string.tool_compress, { viewModel.runCompress(target) }) {
+    ToolPanel(R.string.tool_compress, { viewModel.run(CompressRunner(target)) }) {
         TargetChoices(CompressTarget.entries, target, { stringResource(it.label) }) { target = it }
     }
 }
 
 @Composable
-private fun ShrinkOptions(viewModel: ToolsViewModel) {
-    var target by remember { mutableStateOf(PhotoTarget.Kb100) }
-    ToolPanel(R.string.tool_shrink_photo, { viewModel.runShrinkPhoto(target) }) {
-        TargetChoices(PhotoTarget.entries, target, { stringResource(it.label) }) { target = it }
-    }
-}
-
-@Composable
-private fun <T> TargetChoices(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
+internal fun <T> TargetChoices(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
     Text(stringResource(R.string.tool_target_size), style = MaterialTheme.typography.titleSmall)
     ChoiceChips(options, selected, label, onSelect)
 }

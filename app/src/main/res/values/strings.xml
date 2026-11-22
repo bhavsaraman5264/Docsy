@@ -29,6 +29,7 @@
     <string name="tab_recent">Recent</string>
     <string name="tab_favorites">Favorites</string>
     <string name="intro_tagline">Every file, just a tap away</string>
+    <string name="intro_private">Private · Works without internet</string>
     <string name="home_empty_title">Nothing here yet</string>
     <string name="home_empty_hint">Files you open will show up here</string>
     <string name="favorites_empty">No favorites yet</string>
@@ -36,8 +37,12 @@
     <string name="time_just_now">Just now</string>
     <string name="page_indicator">%1$d / %2$d</string>
     <string name="page_scroller">Fast scroll through pages. Tap to go to a page</string>
+    <string name="list_scroller">Fast scroll. Drag up or down</string>
+    <string name="scroll_percent">%1$d%%</string>
     <string name="page_jump_title">Go to page</string>
     <string name="page_jump_hint">Page 1 to %1$d</string>
+    <string name="row_jump_title">Go to row</string>
+    <string name="row_jump_hint">Row 1 to %1$d</string>
     <string name="search_count">%1$d of %2$d</string>
     <string name="search_none">No results</string>
     <string name="password_title">This file has a password</string>
@@ -103,7 +108,7 @@
     <string name="tool_photos">Photos to PDF</string>
     <string name="tool_photos_hint">Turn photos into one PDF</string>
     <string name="tool_scan">Scan to PDF</string>
-    <string name="tool_scan_hint">Take photos of pages</string>
+    <string name="tool_scan_hint">Edges cut and pages straightened for you</string>
     <string name="tool_merge">Merge PDFs</string>
     <string name="tool_merge_hint">Join files into one</string>
     <string name="tool_split">Split PDF</string>
@@ -129,8 +134,8 @@
     <string name="tool_pdf_to_jpg_hint">Save every page as an image</string>
     <string name="tool_text_to_pdf">Text to PDF</string>
     <string name="tool_text_to_pdf_hint">Turn a TXT file into a PDF</string>
-    <string name="tool_shrink_photo">Shrink photo</string>
-    <string name="tool_shrink_photo_hint">Make a photo or signature small enough for exam and job forms</string>
+    <string name="tool_shrink_photo">Exam photo and sign</string>
+    <string name="tool_shrink_photo_hint">Right size and KB for exam and job forms</string>
     <string name="tool_percent" translatable="false">%1$d%%</string>
     <string name="tool_image_count">%1$d images, %2$s</string>
     <string name="compress_50">Under 50 KB</string>
@@ -178,4 +183,61 @@
     <string name="tool_split_one_page">This PDF has only 1 page, so it can\'t be split.</string>
     <string name="tool_merge_need_two">Add at least 2 PDFs to merge.</string>
     <string name="unlock_not_locked">This PDF had no password, so nothing was removed.</string>
+    <string name="tool_watermark">Watermark</string>
+    <string name="tool_watermark_hint">Write text across every page, like "Only for KYC"</string>
+    <string name="tool_page_numbers">Page numbers</string>
+    <string name="tool_page_numbers_hint">Number every page at the bottom</string>
+    <string name="tool_clean_scan">Clean scan</string>
+    <string name="tool_clean_scan_hint">Remove fingers, shadows, edges and dots from a scanned PDF</string>
+    <string name="clean_what">What to clean</string>
+    <string name="clean_crop">Cut to the paper</string>
+    <string name="clean_edges">Fingers and edges</string>
+    <string name="clean_holes">File holes</string>
+    <string name="clean_light">Even light, white paper</string>
+    <string name="clean_straighten">Straighten</string>
+    <string name="clean_dots">Dots</string>
+    <string name="clean_blank">Remove blank pages</string>
+    <string name="clean_result">Result</string>
+    <string name="clean_color">Colour</string>
+    <string name="clean_black_white">Black and white</string>
+    <string name="clean_note">Text is never erased. Pages with nothing to fix stay exactly as they were.</string>
+    <string name="clean_black_white_note">Looks like a photocopy and makes the file much smaller. Best for forms and WhatsApp.</string>
+    <string name="clean_found">Fingers or edges were removed. Check pages where a finger covered text: hidden text can\'t come back.</string>
+    <string name="clean_nothing">Nothing needed cleaning, so the pages are unchanged.</string>
+    <string name="tool_id_card">ID card copy</string>
+    <string name="tool_id_card_hint">Aadhaar or PAN front and back on one page</string>
+    <string name="id_card_scan">Scan the card</string>
+    <string name="id_card_add_side">Add back side</string>
+    <string name="id_card_add_back">Add the back side too, or make the PDF with just the front.</string>
+    <string name="id_card_ready">Both sides print at the real card size, like a photocopy.</string>
+    <string name="mark_text">Watermark text</string>
+    <string name="mark_kyc">Only for KYC</string>
+    <string name="mark_copy">Copy</string>
+    <string name="mark_confidential">Confidential</string>
+    <string name="number_style">Style</string>
+    <string name="number_place">Position</string>
+    <string name="number_plain" translatable="false">1, 2, 3</string>
+    <string name="number_of_total" translatable="false">1 / 10</string>
+    <string name="number_center">Bottom middle</string>
+    <string name="number_right">Bottom right</string>
+    <string name="photo_for_exam">For a form</string>
+    <string name="photo_for_size">Or just the size</string>
+    <string name="photo_custom">My own size</string>
+    <string name="photo_min_kb">Min KB</string>
+    <string name="photo_max_kb">Max KB</string>
+    <string name="photo_width">Width (px)</string>
+    <string name="photo_height">Height (px)</string>
+    <string name="photo_kb_range">%1$d–%2$d KB</string>
+    <string name="photo_kb_max">Under %1$d KB</string>
+    <string name="photo_pixels" translatable="false">%1$d × %2$d px</string>
+    <string name="photo_name">Name and date on photo (optional)</string>
+    <string name="photo_check_notice">Rules change every year. Check the size in your form\'s notice.</string>
+    <string name="photo_padded">The photo was very small, so the file was made bigger to meet the form\'s minimum. The photo itself is unchanged.</string>
+    <string name="preset_ibps_photo">Bank (IBPS) photo</string>
+    <string name="preset_ibps_sign">Bank (IBPS) signature</string>
+    <string name="preset_ssc_sign">SSC signature</string>
+    <string name="preset_neet_photo">NEET photo</string>
+    <string name="preset_neet_sign">NEET signature</string>
+    <string name="compress_10">Under 10 KB</string>
+    <string name="compress_20">Under 20 KB</string>
 </resources>

@@ -1,5 +1,6 @@
 package app.kholo.reader.core.file
 
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import app.kholo.reader.core.AppError
@@ -42,6 +43,22 @@ class TempFiles(context: Context) {
     private fun checkSpace(knownSize: Long?) {
         val free = dir.parentFile?.usableSpace ?: return
         if (knownSize != null && free < knownSize * SPACE_MARGIN) throw OutOfSpace()
+    }
+
+    /**
+     * Scanner jaise kuch kaam photo app ke cache me `file://` se dete hain. Sirf wahi mitate hain; user ki apni
+     * file (content://) ya cache ke bahar ki file ko kabhi haath nahi lagate.
+     */
+    fun deleteOwnCache(uri: Uri) {
+        val path = uri.path ?: return
+        if (uri.scheme != ContentResolver.SCHEME_FILE) return
+        try {
+            val file = File(path).canonicalFile
+            val cache = appContext.cacheDir.canonicalFile
+            if (file.path.startsWith(cache.path + File.separator)) file.delete()
+        } catch (_: IOException) {
+            // Cache me hai, app agli baar khulne par bhi saaf hota hai.
+        }
     }
 
     fun clearAll() {

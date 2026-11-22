@@ -55,11 +55,14 @@ fun List<RecentFile>.upsert(file: RecentFile): List<RecentFile> {
 }
 
 fun List<RecentFile>.toggleFavorite(uri: String, now: Long): List<RecentFile> = map { file ->
-    when {
-        file.uri != uri -> file
-        file.favorite -> file.copy(favorite = false, favoritedAt = 0L)
-        else -> file.copy(favorite = true, favoritedAt = now)
-    }
+    if (file.uri == uri) file.starred(!file.favorite, now) else file
+}
+
+/** Favorite lagao ya hatao. Naya favorite sabse upar aata hai. */
+fun RecentFile.starred(favorite: Boolean, now: Long = System.currentTimeMillis()): RecentFile = when {
+    favorite == this.favorite -> this
+    favorite -> copy(favorite = true, favoritedAt = now)
+    else -> copy(favorite = false, favoritedAt = 0L)
 }
 
 /** Favorites tab: jo sabse baad me star hui, wo sabse upar. */

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,8 +16,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,8 +55,6 @@ private const val HINT_LINES = 3
 private const val COMPACT_COLUMNS = 2
 private const val MEDIUM_COLUMNS = 3
 private const val EXPANDED_COLUMNS = 4
-private const val TOOL_ROW = "tools"
-private const val GROUP_TITLE = "title"
 
 internal fun toolColumns(width: WidthClass): Int = when (width) {
     WidthClass.Compact -> COMPACT_COLUMNS
@@ -69,36 +66,35 @@ internal fun toolRows(group: ToolGroup, columns: Int): List<List<ToolKind>> =
     ToolKind.entries.filter { it.group == group }.chunked(columns)
 
 /**
- * Tools tab. Lazy list ki har row me cards hote hain, grid nahi: isse ek row ke cards hamesha barabar oonche
- * rehte hain, chahe Hindi ya badi font se ek card ka text lamba ho jaye.
+ * Tools tab. Sirf 19 tools hain, isliye lazy list nahi: sab ek baar ban jate hain aur scroll ke beech koi card
+ * dobara nahi banta, sirf khiskta hai. Lazy list har nayi row par compose aur naap karti thi, jisse jhatka lagta tha.
+ * Har row ke cards barabar oonche rehte hain, chahe Hindi ya badi font se ek card ka text lamba ho jaye.
  */
 @Composable
 fun ToolGrid(onTool: (ToolKind) -> Unit) {
     val columns = toolColumns(rememberWindowInfo().widthClass)
     val sections = remember(columns) { ToolGroup.entries.map { it to toolRows(it, columns) } }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = Spacing.screenPadding,
-            end = Spacing.screenPadding,
-            top = Spacing.m,
-            bottom = Spacing.xl,
-        ),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = Spacing.screenPadding,
+                end = Spacing.screenPadding,
+                top = Spacing.m,
+                bottom = Spacing.xl,
+            ),
         verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
-        item(key = "private") { PrivateNote() }
+        PrivateNote()
         sections.forEach { (group, rows) ->
-            item(key = group.name, contentType = GROUP_TITLE) {
-                Text(
-                    text = stringResource(group.title),
-                    modifier = Modifier.padding(top = Spacing.s),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            items(rows, key = { it.first().name }, contentType = { TOOL_ROW }) { row ->
-                ToolCardRow(row, onTool)
-            }
+            Text(
+                text = stringResource(group.title),
+                modifier = Modifier.padding(top = Spacing.s),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            rows.forEach { row -> ToolCardRow(row, onTool) }
         }
     }
 }

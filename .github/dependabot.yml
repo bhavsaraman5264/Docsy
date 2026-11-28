@@ -1,0 +1,18 @@
+# Dependabot har somvar libraries ke naye version dekhta hai aur PR kholta hai.
+# Chhote updates (minor + patch) ek hi PR me aate hain, bade (major) alag, taaki har ek ko phone par test kar sakein.
+# Security fix wale PR iske alawa turant aate hain (repo Settings → Dependabot security updates).
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
